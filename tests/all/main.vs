@@ -5,6 +5,8 @@ import "crypto/rand"
 import "crypto/sha256"
 import "crypto/hmac"
 import "crypto/hkdf"
+import "crypto/chacha20"
+import "encoding/hex"
 
 var failures = 0
 
@@ -94,12 +96,35 @@ func testHkdf() {
     check(sha256.ToHex(okm) == "3cb25f25faacd57a90434f64d0362f2a2d2d0a90cf1a5a4c5db02d56ecc4c5bf34007208d5b887185865", "hkdf: expand")
 }
 
+func testChaCha20() {
+    print("=== crypto/chacha20 ===")
+    var key = [uint8](repeating: 0, count: 32)
+    var i = 0
+    while i < 32 { key[i] = uint8(i); i += 1 }
+
+    let nonce: [uint8] = [0, 0, 0, 0, 0, 0, 0, 0x4a, 0, 0, 0, 0]
+    let msg = "Ladies and Gentlemen of the class of '99: If I could offer you only one tip for the future, sunscreen would be it."
+    var pt: [uint8] = []
+    for b in msg.utf8 { pt.append(b) }
+
+    do {
+        let ct = try chacha20.Encrypt(key: key, nonce: nonce, plaintext: pt, counter: 1)
+        let ctHex = hex.EncodeToString(ct)
+        check(ctHex == "6e2e359a2568f98041ba0728dd0d6981e97e7aec1d4360c20a27afccfd9fae0bf91b65c5524733ab8f593dabcd62b3571639d624e65152ab8f530c359f0861d807ca0dbf500d6a6156a38e088a22b65e52bc514d16ccf806818ce91ab77937365af90bbf74a35be6b40b8eedf2785e42874d", "chacha20: matches RFC 8439 vector")
+        let decrypted = try chacha20.Decrypt(key: key, nonce: nonce, ciphertext: ct, counter: 1)
+        check(decrypted.count == pt.count, "chacha20: round trip")
+    } catch {
+        check(false, "chacha20: exception")
+    }
+}
+
 func main() -> int32 {
     testSubtle()
     testRand()
     testSha256()
     testHmac()
     testHkdf()
+    testChaCha20()
 
     if failures == 0 {
         print("\n=== all crypto checks passed ===")
