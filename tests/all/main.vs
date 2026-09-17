@@ -6,6 +6,9 @@ import "crypto/sha256"
 import "crypto/hmac"
 import "crypto/hkdf"
 import "crypto/chacha20"
+import "crypto/poly1305"
+import "crypto/chacha20poly1305"
+import "crypto/curve25519"
 import "encoding/hex"
 
 var failures = 0
@@ -118,6 +121,70 @@ func testChaCha20() {
     }
 }
 
+func testPoly1305() {
+    print("=== crypto/poly1305 ===")
+    do {
+        let key = try hex.DecodeString("85d6be7857556d337f4452fe42d506a80103808afb0db2fd4abff6af4149f51b")
+        let text = "Cryptographic Forum Research Group"
+        var msg: [uint8] = []
+        for b in text.utf8 { msg.append(b) }
+
+        let tag = poly1305.Sum(msg, key: key)
+        let tagHex = hex.EncodeToString(tag)
+        check(tagHex == "a8061dc1305136c6c22b8baf0c0127a9", "poly1305: matches RFC 8439 Section 2.5.2 vector")
+        check(poly1305.Verify(mac: tag, msg: msg, key: key), "poly1305: verify valid tag")
+    } catch {
+        check(false, "poly1305: exception")
+    }
+}
+
+func testChaCha20Poly1305() {
+    print("=== crypto/chacha20poly1305 ===")
+    var key = [uint8](repeating: 0, count: 32)
+    var i = 0
+    while i < 32 { key[i] = uint8(0x80 + i); i += 1 }
+
+    let nonce: [uint8] = [7, 0, 0, 0, 0x40, 0x41, 0x42, 0x43, 0x44, 0x45, 0x46, 0x47]
+    let aad: [uint8] = [0x50, 0x51, 0x52, 0x53, 0xc0, 0xc1, 0xc2, 0xc3, 0xc4, 0xc5, 0xc6, 0xc7]
+    let msg = "Ladies and Gentlemen of the class of '99: If I could offer you only one tip for the future, sunscreen would be it."
+    var pt: [uint8] = []
+    for b in msg.utf8 { pt.append(b) }
+
+    do {
+        let sealed = try chacha20poly1305.Seal(key: key, nonce: nonce, plaintext: pt, additionalData: aad)
+        let ctLen = sealed.count - 16
+        var tag = [uint8](repeating: 0, count: 16)
+        var t = 0
+        while t < 16 { tag[t] = sealed[ctLen + t]; t += 1 }
+        check(hex.EncodeToString(tag) == "1ae10b594f09e26a7e902ecbd0600691", "chacha20poly1305: matches RFC 8439 Section 2.8.2 tag")
+
+        let opened = try chacha20poly1305.Open(key: key, nonce: nonce, ciphertextAndTag: sealed, additionalData: aad)
+        check(opened.count == pt.count, "chacha20poly1305: round trip")
+    } catch {
+        check(false, "chacha20poly1305: exception")
+    }
+}
+
+func testCurve25519() {
+    print("=== crypto/curve25519 ===")
+    do {
+        let alicePriv = try hex.DecodeString("77076d0a7318a57d3c16c17251b26645df4c2f87ebc0992ab177fba51db92c2a")
+        let alicePub = try curve25519.ScalarBaseMult(scalar: alicePriv)
+        check(hex.EncodeToString(alicePub) == "8520f0098930a754748b7ddcb43ef75a0dbf3a0d26381af4eba4a98eaa9b4e6a", "curve25519: Alice public key RFC 7748")
+
+        let bobPriv = try hex.DecodeString("5dab087e624a8a4b79e17f8b83800ee66f3bb1292618b6fd1c2f8b27ff88e0eb")
+        let bobPub = try curve25519.ScalarBaseMult(scalar: bobPriv)
+        check(hex.EncodeToString(bobPub) == "de9edb7d7b7dc1b4d35b61c2ece435373f8343c85b78674dadfc7e146f882b4f", "curve25519: Bob public key RFC 7748")
+
+        let sharedA = try curve25519.ScalarMult(scalar: alicePriv, point: bobPub)
+        let sharedB = try curve25519.ScalarMult(scalar: bobPriv, point: alicePub)
+        check(hex.EncodeToString(sharedA) == "4a5d9d5ba4ce2de1728e3bf480350f25e07e21c947d19e3376f09b3c1e161742", "curve25519: shared secret RFC 7748")
+        check(hex.EncodeToString(sharedA) == hex.EncodeToString(sharedB), "curve25519: shared secret symmetric")
+    } catch {
+        check(false, "curve25519: exception")
+    }
+}
+
 func main() -> int32 {
     testSubtle()
     testRand()
@@ -125,6 +192,9 @@ func main() -> int32 {
     testHmac()
     testHkdf()
     testChaCha20()
+    testPoly1305()
+    testChaCha20Poly1305()
+    testCurve25519()
 
     if failures == 0 {
         print("\n=== all crypto checks passed ===")
