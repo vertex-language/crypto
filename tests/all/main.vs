@@ -9,6 +9,7 @@ import "crypto/chacha20"
 import "crypto/poly1305"
 import "crypto/chacha20poly1305"
 import "crypto/curve25519"
+import "crypto/tls"
 import "encoding/hex"
 
 var failures = 0
@@ -185,6 +186,44 @@ func testCurve25519() {
     }
 }
 
+func testTls() {
+    print("=== crypto/tls ===")
+    let secret = [uint8](repeating: 0x55, count: 32)
+    let context = [uint8](repeating: 0xaa, count: 32)
+    let derived = tls.HkdfExpandLabel(secret: secret, label: "c hs traffic", context: context, length: 32)
+    check(derived.count == 32, "tls: HkdfExpandLabel length 32")
+
+    var ks = tls.KeySchedule()
+    check(ks.EarlySecret.count == 32, "tls: EarlySecret initialized")
+    let dummyShared = [uint8](repeating: 0x42, count: 32)
+    ks.DeriveHandshakeSecret(sharedSecret: dummyShared)
+    check(ks.HandshakeSecret.count == 32, "tls: HandshakeSecret derived")
+
+    do {
+        let key = [uint8](repeating: 0x11, count: 32)
+        let iv = [uint8](repeating: 0x22, count: 12)
+        var encCipher = tls.RecordCipher(key: key, iv: iv)
+        var decCipher = tls.RecordCipher(key: key, iv: iv)
+
+        let plaintext: [uint8] = [0x01, 0x02, 0x03, 0x04]
+        let record = try encCipher.Encrypt(contentType: tls.RecordType.ApplicationData, plaintext: plaintext)
+        check(record.count == 5 + plaintext.count + 1 + 16, "tls: record length matches")
+
+        var header = [uint8](repeating: 0, count: 5)
+        var payload = [uint8](repeating: 0, count: record.count - 5)
+        var i = 0
+        while i < 5 { header[i] = record[i]; i += 1 }
+        i = 0
+        while i < payload.count { payload[i] = record[5 + i]; i += 1 }
+
+        let dec = try decCipher.Decrypt(header: header, payload: payload)
+        check(dec.ContentType == tls.RecordType.ApplicationData, "tls: decrypted content type")
+        check(dec.Data.count == plaintext.count && dec.Data[0] == 0x01 && dec.Data[3] == 0x04, "tls: decrypted plaintext matches")
+    } catch {
+        check(false, "tls: exception during record test")
+    }
+}
+
 func main() -> int32 {
     testSubtle()
     testRand()
@@ -195,6 +234,7 @@ func main() -> int32 {
     testPoly1305()
     testChaCha20Poly1305()
     testCurve25519()
+    testTls()
 
     if failures == 0 {
         print("\n=== all crypto checks passed ===")
