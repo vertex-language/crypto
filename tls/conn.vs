@@ -15,7 +15,16 @@ public struct Conn {
     var serverCipher: RecordCipher = RecordCipher(key: [], iv: [])
     var readBuffer: [uint8] = []
 
-    public init(stream: tcp.TcpStream, config: Config = Config()) {
+    public init(stream: tcp.TcpStream) {
+        self.stream = stream
+        self.config = Config()
+        self.state = ConnectionState()
+        self.clientCipher = RecordCipher(key: [], iv: [])
+        self.serverCipher = RecordCipher(key: [], iv: [])
+        self.readBuffer = []
+    }
+
+    public init(stream: tcp.TcpStream, config: Config) {
         self.stream = stream
         self.config = config
         self.state = ConnectionState()
