@@ -294,3 +294,39 @@ public func ParseServerHello(_ msg: [uint8]) throws -> ServerHelloInfo {
 
     return ServerHelloInfo(serverRandom: serverRandom, cipherSuite: suite, serverPublicKey: serverPubKey)
 }
+
+/// Parses the EncryptedExtensions handshake message and returns negotiated ALPN protocol if present.
+public func ParseEncryptedExtensions(_ msg: [uint8]) -> string {
+    if msg.count < 6 || msg[0] != HandshakeEncryptedExtensions {
+        return ""
+    }
+    // msg[0] = type (8), msg[1..3] = length
+    // Extensions start at offset 4: 2 bytes extsLen
+    let extsLen = (int(msg[4]) << 8) | int(msg[5])
+    var offset = 6
+    let endOffset = (6 + extsLen <= msg.count) ? (6 + extsLen) : msg.count
+
+    while offset + 4 <= endOffset {
+        let extType = (uint16(msg[offset]) << 8) | uint16(msg[offset + 1])
+        let extLen = (int(msg[offset + 2]) << 8) | int(msg[offset + 3])
+        offset += 4
+        if offset + extLen > endOffset {
+            break
+        }
+        if extType == ExtALPN && extLen >= 3 {
+            // ALPN extension: 2 bytes listLen, 1 byte protoLen, proto bytes
+            let protoLen = int(msg[offset + 2])
+            if offset + 3 + protoLen <= endOffset {
+                var pBytes: [uint8] = []
+                var pi = 0
+                while pi < protoLen {
+                    pBytes.append(msg[offset + 3 + pi])
+                    pi += 1
+                }
+                return string(decoding: pBytes, as: UTF8.self)
+            }
+        }
+        offset += extLen
+    }
+    return ""
+}

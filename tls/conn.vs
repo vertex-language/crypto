@@ -141,6 +141,10 @@ public struct Conn {
                 hsBuf = remain
 
                 if msgType == HandshakeEncryptedExtensions {
+                    let alpn = ParseEncryptedExtensions(fullMsg)
+                    if !alpn.isEmpty {
+                        self.state.NegotiatedProtocol = alpn
+                    }
                     transcript.Update(fullMsg)
                 } else if msgType == HandshakeCertificate {
                     transcript.Update(fullMsg)
