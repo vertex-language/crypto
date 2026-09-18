@@ -349,6 +349,11 @@ public func Client(_ stream: tcp.TcpStream, config: Config = Config()) -> Conn {
     return Conn(stream: stream, config: config)
 }
 
+/// Connect connects to host and port over TCP, then performs the TLS 1.3 handshake.
+public func Connect(host: string, port: uint16, config: Config = Config()) async throws -> Conn {
+    return try await Dial(host: host, port: port, config: config)
+}
+
 /// Dial connects to host and port over TCP, then performs the TLS 1.3 handshake.
 public func Dial(host: string, port: uint16, config: Config = Config()) async throws -> Conn {
     var cfg = config
@@ -360,3 +365,4 @@ public func Dial(host: string, port: uint16, config: Config = Config()) async th
     try await conn.Handshake()
     return conn
 }
+
