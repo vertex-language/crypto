@@ -10,6 +10,8 @@ func hashLength(_ alg: hmac.HashAlgorithm) -> int {
         return 28
     case .sha1:
         return 20
+    case .md5:
+        return 16
     }
 }
 

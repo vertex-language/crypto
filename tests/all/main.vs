@@ -12,6 +12,7 @@ import "crypto/curve25519"
 import "crypto/tls"
 import "crypto/sha1"
 import "crypto/crc32"
+import "crypto/md5"
 import "encoding/hex"
 
 var failures = 0
@@ -246,12 +247,23 @@ func testCrc32() {
     check(crc32.ChecksumString("The quick brown fox jumps over the lazy dog") == 0x414fa339, "crc32: standard pangram")
 }
 
+func testMd5() {
+    print("=== crypto/md5 ===")
+    check(md5.ToHex(md5.SumString("")) == "d41d8cd98f00b204e9800998ecf8427e", "md5: empty string")
+    check(md5.ToHex(md5.SumString("abc")) == "900150983cd24fb0d6963f7d28e17f72", "md5: abc")
+    check(md5.ToHex(md5.SumString("user:realm:pass")) == "8493fbc53ba582fb4c044c456bdc40eb", "md5: turn key derivation")
+    let k = [uint8](repeating: 0x0b, count: 16)
+    let mac = hmac.Compute(key: k, message: "Hi There", hash: .md5)
+    check(md5.ToHex(mac) == "9294727a3638bb1c13f48ef8158bfc9d", "hmac-md5: RFC 2202 test 1")
+}
+
 func main() -> int32 {
     testSubtle()
     testRand()
     testSha256()
     testSha1()
     testCrc32()
+    testMd5()
     testHmac()
     testHkdf()
     testChaCha20()
