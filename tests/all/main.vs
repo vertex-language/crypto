@@ -10,6 +10,8 @@ import "crypto/poly1305"
 import "crypto/chacha20poly1305"
 import "crypto/curve25519"
 import "crypto/tls"
+import "crypto/sha1"
+import "crypto/crc32"
 import "encoding/hex"
 
 var failures = 0
@@ -224,10 +226,32 @@ func testTls() {
     }
 }
 
+func testSha1() {
+    print("=== crypto/sha1 ===")
+    let h1 = sha1.ToHex(sha1.Sum1String(""))
+    check(h1 == "da39a3ee5e6b4b0d3255bfef95601890afd80709", "sha1: empty string")
+
+    let h2 = sha1.ToHex(sha1.Sum1String("abc"))
+    check(h2 == "a9993e364706816aba3e25717850c26c9cd0d89d", "sha1: abc")
+
+    let k1 = [uint8](repeating: 0x0b, count: 20)
+    let mac1 = hmac.Compute(key: k1, message: "Hi There", hash: .sha1)
+    check(sha1.ToHex(mac1) == "b617318655057264e28bc0b6fb378c8ef146be00", "hmac-sha1: RFC 2202 test 1")
+}
+
+func testCrc32() {
+    print("=== crypto/crc32 ===")
+    check(crc32.ChecksumString("") == 0, "crc32: empty string")
+    check(crc32.ChecksumString("123456789") == 0xcbf43926, "crc32: 123456789")
+    check(crc32.ChecksumString("The quick brown fox jumps over the lazy dog") == 0x414fa339, "crc32: standard pangram")
+}
+
 func main() -> int32 {
     testSubtle()
     testRand()
     testSha256()
+    testSha1()
+    testCrc32()
     testHmac()
     testHkdf()
     testChaCha20()

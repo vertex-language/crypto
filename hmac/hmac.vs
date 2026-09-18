@@ -1,16 +1,18 @@
 package hmac
 
 import "crypto/sha256"
+import "crypto/sha1"
 import "crypto/subtle"
 
 public enum HashAlgorithm {
     case sha256
     case sha224
+    case sha1
 }
 
 func hashBlockSize(_ alg: HashAlgorithm) -> int {
     switch alg {
-    case .sha256, .sha224:
+    case .sha256, .sha224, .sha1:
         return 64
     }
 }
@@ -21,6 +23,8 @@ func hashFunc(_ alg: HashAlgorithm, _ data: [uint8]) -> [uint8] {
         return sha256.Sum256(data)
     case .sha224:
         return sha256.Sum224(data)
+    case .sha1:
+        return sha1.Sum1(data)
     }
 }
 
