@@ -165,11 +165,56 @@ func testFingerprint() {
     check(dtls.VerifyFingerprint(sampleCert, expectedFingerprint: lowerFp), "fingerprint: VerifyFingerprint case-insensitive match")
 }
 
+func testHandshake() {
+    print("\n=== Testing Handshake Framing and Hello Negotiation ===")
+
+    let dummyPayload: [uint8] = [1, 2, 3, 4, 5]
+    let wrapped = dtls.WrapDtlsHandshake(type: dtls.HandshakeType.ClientHello, body: dummyPayload, messageSeq: 7)
+    check(wrapped.count == 12 + dummyPayload.count, "handshake: wrapped size is 12-byte header + body")
+    check(wrapped[0] == dtls.HandshakeType.ClientHello, "handshake: header msg_type correct")
+    check(wrapped[4] == 0 && wrapped[5] == 7, "handshake: message_seq 7 encoded correctly")
+
+    let parsed = dtls.ParseDtlsHandshake(data: wrapped)
+    check(parsed.Ok, "handshake: parsed successfully")
+    check(parsed.Message.Type == dtls.HandshakeType.ClientHello, "handshake: parsed type matches")
+    check(parsed.Message.MessageSeq == 7, "handshake: parsed message_seq matches")
+    check(parsed.Message.Body.count == dummyPayload.count, "handshake: parsed body count matches")
+
+    // Client Hello & Server Hello
+    do {
+        let clientPriv = [uint8](repeating: 0x01, count: 32)
+        let clientPub = try curve25519.ScalarBaseMult(clientPriv)
+        let serverPriv = [uint8](repeating: 0x02, count: 32)
+        let serverPub = try curve25519.ScalarBaseMult(serverPriv)
+
+        let chRand = [uint8](repeating: 0xaa, count: 32)
+        let chBody = dtls.BuildDtlsClientHello(random: chRand, sessionId: [1, 2, 3], cookie: [], publicKey: clientPub, srtpProfiles: [0x0001])
+        let chParsed = dtls.ParseDtlsClientHello(body: chBody)
+        check(chParsed.PublicKey.count == 32, "client hello: parsed 32-byte public key")
+        check(chParsed.SrtpProfile == 0x0001, "client hello: parsed SRTP profile 0x0001")
+
+        let shRand = [uint8](repeating: 0xbb, count: 32)
+        let shBody = dtls.BuildDtlsServerHello(random: shRand, sessionId: [1, 2, 3], cipherSuite: 0x1303, publicKey: serverPub, srtpProfile: 0x0001)
+        let shParsed = dtls.ParseDtlsServerHello(body: shBody)
+        check(shParsed.CipherSuite == 0x1303, "server hello: parsed cipher suite 0x1303")
+        check(shParsed.PublicKey.count == 32, "server hello: parsed 32-byte public key")
+        check(shParsed.SrtpProfile == 0x0001, "server hello: parsed SRTP profile 0x0001")
+
+        // Curve25519 DH key exchange
+        let clientShared = try curve25519.ScalarMult(scalar: clientPriv, point: shParsed.PublicKey)
+        let serverShared = try curve25519.ScalarMult(scalar: serverPriv, point: chParsed.PublicKey)
+        check(clientShared == serverShared, "handshake: client and server derive identical shared secret")
+    } catch {
+        check(false, "handshake: curve25519 error")
+    }
+}
+
 func main() -> int32 {
     testReplayWindow()
     testRecordProtection()
     testSrtpKeyDerivation()
     testFingerprint()
+    testHandshake()
 
     if failures == 0 {
         print("\nAll crypto/dtls tests passed!")
@@ -179,3 +224,4 @@ func main() -> int32 {
         return int32(failures)
     }
 }
+
