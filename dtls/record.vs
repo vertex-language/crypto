@@ -15,7 +15,7 @@ public struct RecordCipher {
     public var Key: [uint8]
     public var IV: [uint8]
     public var Epoch: uint16
-    public var SequenceNumber: uint64 = 0
+    public var SequenceNumber: uint64
     public var Window: AntiReplayWindow
 
     public init(key: [uint8], iv: [uint8], epoch: uint16 = 0) {
