@@ -246,6 +246,7 @@ func testCrc32() {
     check(crc32.ChecksumString("") == 0, "crc32: empty string")
     check(crc32.ChecksumString("123456789") == 0xcbf43926, "crc32: 123456789")
     check(crc32.ChecksumString("The quick brown fox jumps over the lazy dog") == 0x414fa339, "crc32: standard pangram")
+    check(crc32.ChecksumCastagnoliString("123456789") == 0xe3069283, "crc32c: 123456789 matches RFC 3309")
 }
 
 func testMd5() {
