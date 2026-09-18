@@ -13,6 +13,7 @@ import "crypto/tls"
 import "crypto/sha1"
 import "crypto/crc32"
 import "crypto/md5"
+import "crypto/dtls"
 import "encoding/hex"
 
 var failures = 0
@@ -257,6 +258,31 @@ func testMd5() {
     check(md5.ToHex(mac) == "9294727a3638bb1c13f48ef8158bfc9d", "hmac-md5: RFC 2202 test 1")
 }
 
+func testDtls() {
+    print("=== crypto/dtls ===")
+    var win = dtls.AntiReplayWindow()
+    check(win.Update(1), "dtls: replay window accepts seq 1")
+    check(!win.Update(1), "dtls: replay window rejects duplicate seq 1")
+
+    let key = [uint8](repeating: 0x55, count: 32)
+    let iv = [uint8](repeating: 0xaa, count: 12)
+    var enc = dtls.RecordCipher(key: key, iv: iv, epoch: 1)
+    var dec = dtls.RecordCipher(key: key, iv: iv, epoch: 1)
+    do {
+        let record = try enc.Encrypt(contentType: dtls.ContentType.ApplicationData, plaintext: [1, 2, 3, 4])
+        let opened = try dec.Decrypt(record: record)
+        check(opened.Data.count == 4 && opened.Data[0] == 1, "dtls: record encrypt/decrypt roundtrip")
+    } catch {
+        check(false, "dtls: record exception")
+    }
+
+    let srtpKeys = dtls.DeriveSrtpKeys(exporterSecret: key, keyLength: 16, saltLength: 14)
+    check(srtpKeys.ClientWriteKey.count == 16, "dtls: SRTP client key length 16")
+
+    let fp = dtls.CalculateFingerprint([0x30, 0x82, 0x01])
+    check(!fp.isEmpty, "dtls: certificate fingerprint generated")
+}
+
 func main() -> int32 {
     testSubtle()
     testRand()
@@ -264,6 +290,7 @@ func main() -> int32 {
     testSha1()
     testCrc32()
     testMd5()
+    testDtls()
     testHmac()
     testHkdf()
     testChaCha20()
