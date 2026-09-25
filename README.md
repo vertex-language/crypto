@@ -4,13 +4,13 @@
 [![crypto: tls1.3-ready](https://img.shields.io/badge/crypto-tls1.3--ready-f4f4f5?style=flat-square&labelColor=e4e4e7&color=18181b)](https://github.com/vertex-language/crypto)
 [![memory: pure-buffers](https://img.shields.io/badge/memory-pure--buffers-f4f4f5?style=flat-square&labelColor=e4e4e7&color=18181b)](https://github.com/vertex-language)
 
-Standard cryptographic library for the Vertex programming language, providing pure in-memory cryptographic primitives, secure random entropy, hash algorithms, authenticated ciphers, and key exchange leading to TLS 1.3 and `net/https`.
+Standard cryptographic library for the Vertex programming language, providing in-memory cryptographic primitives, secure random entropy, hash algorithms, authenticated ciphers, and key exchange up to TLS 1.3.
 
 ---
 
 ## Packages
 
-All packages in this domain repository use Golang-style directory packages (`crypto/<pkg>`) compiled directly from pure Vertex sources:
+All packages in this repository are organized as directory packages (`crypto/<pkg>`):
 
 - **`crypto/subtle`**: Constant-time comparison routines to prevent timing side-channel attacks (`subtle.ConstantTimeCompare`).
 - **`crypto/rand`**: Cryptographically secure pseudorandom entropy from the OS CSPRNG (`rand.Read`, `rand.Bytes`).
