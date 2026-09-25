@@ -1,10 +1,9 @@
 # crypto
 
-[![package: stdlib](https://img.shields.io/badge/package-stdlib-f4f4f5?style=flat-square&labelColor=e4e4e7&color=18181b)](https://github.com/vertex-language)
+[![package: vs-package](https://img.shields.io/badge/package-vs--package-f4f4f5?style=flat-square&labelColor=e4e4e7&color=18181b)](https://github.com/vertex-language)
 [![crypto: tls1.3-ready](https://img.shields.io/badge/crypto-tls1.3--ready-f4f4f5?style=flat-square&labelColor=e4e4e7&color=18181b)](https://github.com/vertex-language/crypto)
-[![memory: pure-buffers](https://img.shields.io/badge/memory-pure--buffers-f4f4f5?style=flat-square&labelColor=e4e4e7&color=18181b)](https://github.com/vertex-language)
 
-Standard cryptographic library for the Vertex programming language, providing in-memory cryptographic primitives, secure random entropy, hash algorithms, authenticated ciphers, and key exchange up to TLS 1.3.
+Cryptographic library providing in-memory cryptographic primitives, secure random entropy, hash algorithms, authenticated ciphers, and key exchange up to TLS 1.3.
 
 ---
 
@@ -36,6 +35,12 @@ For the comprehensive design document and Golang equivalence map, see [docs/prop
 ---
 
 ## Quick Start
+
+Run any entry point with:
+
+```bash
+vsc run main.vs
+```
 
 ### SHA-256 Digest
 
