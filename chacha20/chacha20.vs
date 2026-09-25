@@ -69,52 +69,105 @@ public struct Cipher {
 
     /// XORKeyStream encrypts or decrypts src into dst using the ChaCha20 keystream.
     public mutating func XORKeyStream(_ dst: inout [uint8], _ src: [uint8]) {
-        var offset = 0
-        while offset < src.count {
-            var state: [uint32] = [
-                0x61707865, 0x3320646e, 0x79622d32, 0x6b206574,
-                key[0], key[1], key[2], key[3],
-                key[4], key[5], key[6], key[7],
-                counter, nonce[0], nonce[1], nonce[2]
-            ]
-            counter &+= 1
+        // The state is sixteen locals, not an array: a block is then
+        // arithmetic on registers, with nothing allocated.
+        let k0 = key[0], k1 = key[1], k2 = key[2], k3 = key[3]
+        let k4 = key[4], k5 = key[5], k6 = key[6], k7 = key[7]
+        let n0 = nonce[0], n1 = nonce[1], n2 = nonce[2]
+        let total = src.count
+        var ctr = counter
+        dst.withUnsafeMutableBufferPointer { out in
+            src.withUnsafeBufferPointer { inp in
+                var offset = 0
+                while offset < total {
+                    var x0: uint32 = 0x61707865, x1: uint32 = 0x3320646e
+                    var x2: uint32 = 0x79622d32, x3: uint32 = 0x6b206574
+                    var x4 = k0, x5 = k1, x6 = k2, x7 = k3
+                    var x8 = k4, x9 = k5, x10 = k6, x11 = k7
+                    var x12 = ctr, x13 = n0, x14 = n1, x15 = n2
+                    var round = 0
+                    while round < 10 {
+                        // Column round
+                        x0 &+= x4; x12 ^= x0; x12 = (x12 << 16) | (x12 >> 16)
+                        x8 &+= x12; x4 ^= x8; x4 = (x4 << 12) | (x4 >> 20)
+                        x0 &+= x4; x12 ^= x0; x12 = (x12 << 8) | (x12 >> 24)
+                        x8 &+= x12; x4 ^= x8; x4 = (x4 << 7) | (x4 >> 25)
+                        x1 &+= x5; x13 ^= x1; x13 = (x13 << 16) | (x13 >> 16)
+                        x9 &+= x13; x5 ^= x9; x5 = (x5 << 12) | (x5 >> 20)
+                        x1 &+= x5; x13 ^= x1; x13 = (x13 << 8) | (x13 >> 24)
+                        x9 &+= x13; x5 ^= x9; x5 = (x5 << 7) | (x5 >> 25)
+                        x2 &+= x6; x14 ^= x2; x14 = (x14 << 16) | (x14 >> 16)
+                        x10 &+= x14; x6 ^= x10; x6 = (x6 << 12) | (x6 >> 20)
+                        x2 &+= x6; x14 ^= x2; x14 = (x14 << 8) | (x14 >> 24)
+                        x10 &+= x14; x6 ^= x10; x6 = (x6 << 7) | (x6 >> 25)
+                        x3 &+= x7; x15 ^= x3; x15 = (x15 << 16) | (x15 >> 16)
+                        x11 &+= x15; x7 ^= x11; x7 = (x7 << 12) | (x7 >> 20)
+                        x3 &+= x7; x15 ^= x3; x15 = (x15 << 8) | (x15 >> 24)
+                        x11 &+= x15; x7 ^= x11; x7 = (x7 << 7) | (x7 >> 25)
+                        // Diagonal round
+                        x0 &+= x5; x15 ^= x0; x15 = (x15 << 16) | (x15 >> 16)
+                        x10 &+= x15; x5 ^= x10; x5 = (x5 << 12) | (x5 >> 20)
+                        x0 &+= x5; x15 ^= x0; x15 = (x15 << 8) | (x15 >> 24)
+                        x10 &+= x15; x5 ^= x10; x5 = (x5 << 7) | (x5 >> 25)
+                        x1 &+= x6; x12 ^= x1; x12 = (x12 << 16) | (x12 >> 16)
+                        x11 &+= x12; x6 ^= x11; x6 = (x6 << 12) | (x6 >> 20)
+                        x1 &+= x6; x12 ^= x1; x12 = (x12 << 8) | (x12 >> 24)
+                        x11 &+= x12; x6 ^= x11; x6 = (x6 << 7) | (x6 >> 25)
+                        x2 &+= x7; x13 ^= x2; x13 = (x13 << 16) | (x13 >> 16)
+                        x8 &+= x13; x7 ^= x8; x7 = (x7 << 12) | (x7 >> 20)
+                        x2 &+= x7; x13 ^= x2; x13 = (x13 << 8) | (x13 >> 24)
+                        x8 &+= x13; x7 ^= x8; x7 = (x7 << 7) | (x7 >> 25)
+                        x3 &+= x4; x14 ^= x3; x14 = (x14 << 16) | (x14 >> 16)
+                        x9 &+= x14; x4 ^= x9; x4 = (x4 << 12) | (x4 >> 20)
+                        x3 &+= x4; x14 ^= x3; x14 = (x14 << 8) | (x14 >> 24)
+                        x9 &+= x14; x4 ^= x9; x4 = (x4 << 7) | (x4 >> 25)
+                        round += 1
+                    }
+                    x0 &+= 0x61707865; x1 &+= 0x3320646e; x2 &+= 0x79622d32; x3 &+= 0x6b206574
+                    x4 &+= k0; x5 &+= k1; x6 &+= k2; x7 &+= k3
+                    x8 &+= k4; x9 &+= k5; x10 &+= k6; x11 &+= k7
+                    x12 &+= ctr; x13 &+= n0; x14 &+= n1; x15 &+= n2
+                    ctr &+= 1
 
-            var working = state
-            var round = 0
-            while round < 10 {
-                // Column round
-                qround(&working, 0, 4, 8, 12)
-                qround(&working, 1, 5, 9, 13)
-                qround(&working, 2, 6, 10, 14)
-                qround(&working, 3, 7, 11, 15)
-                // Diagonal round
-                qround(&working, 0, 5, 10, 15)
-                qround(&working, 1, 6, 11, 12)
-                qround(&working, 2, 7, 8, 13)
-                qround(&working, 3, 4, 9, 14)
-                round += 1
+                    let chunkLen = total - offset < 64 ? total - offset : 64
+                    var j = 0
+                    while j < chunkLen {
+                        var word: uint32 = 0
+                        switch j >> 2 {
+                        case 0: word = x0
+                        case 1: word = x1
+                        case 2: word = x2
+                        case 3: word = x3
+                        case 4: word = x4
+                        case 5: word = x5
+                        case 6: word = x6
+                        case 7: word = x7
+                        case 8: word = x8
+                        case 9: word = x9
+                        case 10: word = x10
+                        case 11: word = x11
+                        case 12: word = x12
+                        case 13: word = x13
+                        case 14: word = x14
+                        default: word = x15
+                        }
+                        // Four bytes of the word at a time where they fit.
+                        if j + 4 <= chunkLen {
+                            out[offset + j] = inp[offset + j] ^ uint8(truncatingIfNeeded: word)
+                            out[offset + j + 1] = inp[offset + j + 1] ^ uint8(truncatingIfNeeded: word >> 8)
+                            out[offset + j + 2] = inp[offset + j + 2] ^ uint8(truncatingIfNeeded: word >> 16)
+                            out[offset + j + 3] = inp[offset + j + 3] ^ uint8(truncatingIfNeeded: word >> 24)
+                            j += 4
+                        } else {
+                            out[offset + j] = inp[offset + j] ^ uint8(truncatingIfNeeded: word >> uint32((j & 3) * 8))
+                            j += 1
+                        }
+                    }
+                    offset += chunkLen
+                }
             }
-
-            var ks = [uint8](repeating: 0, count: 64)
-            var w = 0
-            while w < 16 {
-                let sum = working[w] &+ state[w]
-                let base = w * 4
-                ks[base] = uint8(truncatingIfNeeded: sum)
-                ks[base + 1] = uint8(truncatingIfNeeded: sum >> 8)
-                ks[base + 2] = uint8(truncatingIfNeeded: sum >> 16)
-                ks[base + 3] = uint8(truncatingIfNeeded: sum >> 24)
-                w += 1
-            }
-
-            let chunkLen = src.count - offset < 64 ? src.count - offset : 64
-            var j = 0
-            while j < chunkLen {
-                dst[offset + j] = src[offset + j] ^ ks[j]
-                j += 1
-            }
-            offset += chunkLen
         }
+        counter = ctr
     }
 }
 

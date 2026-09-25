@@ -14,6 +14,7 @@ public struct Conn {
     var clientCipher: RecordCipher = RecordCipher(key: [], iv: [])
     var serverCipher: RecordCipher = RecordCipher(key: [], iv: [])
     var readBuffer: [uint8] = []
+    var readPos: int = 0
 
     public init(stream: tcp.TcpStream) {
         self.stream = stream
@@ -93,8 +94,8 @@ public struct Conn {
         keySchedule.DeriveHandshakeSecret(sharedSecret: sharedSecret)
 
         let hsTraffic = keySchedule.DeriveHandshakeTrafficSecrets(transcriptHash: transcript.CurrentHash())
-        let clientHsKeys = keySchedule.DeriveTrafficKeys(trafficSecret: hsTraffic.ClientSecret)
-        let serverHsKeys = keySchedule.DeriveTrafficKeys(trafficSecret: hsTraffic.ServerSecret)
+        let clientHsKeys = keySchedule.DeriveTrafficKeys(trafficSecret: hsTraffic.ClientSecret, cipherSuite: shInfo.CipherSuite)
+        let serverHsKeys = keySchedule.DeriveTrafficKeys(trafficSecret: hsTraffic.ServerSecret, cipherSuite: shInfo.CipherSuite)
 
         let serverFinishedKey = keySchedule.DeriveFinishedKey(trafficSecret: hsTraffic.ServerSecret)
         let clientFinishedKey = keySchedule.DeriveFinishedKey(trafficSecret: hsTraffic.ClientSecret)
@@ -207,8 +208,8 @@ public struct Conn {
         // 10. Transition to Application Traffic Secrets & Ciphers
         keySchedule.DeriveMasterSecret()
         let appTraffic = keySchedule.DeriveApplicationTrafficSecrets(transcriptHash: transcript.CurrentHash())
-        let clientAppKeys = keySchedule.DeriveTrafficKeys(trafficSecret: appTraffic.ClientSecret)
-        let serverAppKeys = keySchedule.DeriveTrafficKeys(trafficSecret: appTraffic.ServerSecret)
+        let clientAppKeys = keySchedule.DeriveTrafficKeys(trafficSecret: appTraffic.ClientSecret, cipherSuite: shInfo.CipherSuite)
+        let serverAppKeys = keySchedule.DeriveTrafficKeys(trafficSecret: appTraffic.ServerSecret, cipherSuite: shInfo.CipherSuite)
 
         self.clientCipher = RecordCipher(key: clientAppKeys.Key, iv: clientAppKeys.IV, cipherSuite: shInfo.CipherSuite)
         self.serverCipher = RecordCipher(key: serverAppKeys.Key, iv: serverAppKeys.IV, cipherSuite: shInfo.CipherSuite)
@@ -224,8 +225,13 @@ public struct Conn {
         if !self.state.HandshakeComplete {
             try await self.Handshake()
         }
+        if buffer.isEmpty {
+            return 0
+        }
 
-        while self.readBuffer.isEmpty {
+        // A record's plaintext is kept whole and read from readPos on:
+        // nothing is moved until the next record replaces it.
+        while self.readPos >= self.readBuffer.count {
             var header = [uint8](repeating: 0, count: 5)
             let n = try await self.stream.Read(into: &header)
             if n == 0 {
@@ -254,29 +260,25 @@ public struct Conn {
                 throw TlsError.alertReceived("code \(code): alert received from server during read")
             }
             if dec.ContentType == RecordApplicationData {
+                self.readBuffer = dec.Data
+                self.readPos = 0
+            }
+            // Post-handshake messages (NewSessionTicket) are dropped.
+        }
+
+        let avail = self.readBuffer.count - self.readPos
+        let count = buffer.count < avail ? buffer.count : avail
+        let from = self.readPos
+        buffer.withUnsafeMutableBufferPointer { dst in
+            self.readBuffer.withUnsafeBufferPointer { src in
                 var i = 0
-                while i < dec.Data.count {
-                    self.readBuffer.append(dec.Data[i])
+                while i < count {
+                    dst[i] = src[from + i]
                     i += 1
                 }
             }
         }
-
-        let count = buffer.count < self.readBuffer.count ? buffer.count : self.readBuffer.count
-        var i = 0
-        while i < count {
-            buffer[i] = self.readBuffer[i]
-            i += 1
-        }
-
-        var remaining: [uint8] = []
-        var remIdx = count
-        while remIdx < self.readBuffer.count {
-            remaining.append(self.readBuffer[remIdx])
-            remIdx += 1
-        }
-        self.readBuffer = remaining
-
+        self.readPos += count
         return count
     }
 
@@ -284,16 +286,24 @@ public struct Conn {
     public mutating func ReadFull(into buffer: inout [uint8]) async throws {
         let wanted = buffer.count
         var filled = 0
+        var chunk = [uint8](repeating: 0, count: wanted)
         while filled < wanted {
-            var chunk = [uint8](repeating: 0, count: wanted - filled)
+            if chunk.count != wanted - filled {
+                chunk = [uint8](repeating: 0, count: wanted - filled)
+            }
             let n = try await self.Read(into: &chunk)
             if n == 0 {
                 throw TlsError.closed("stream closed before buffer was filled")
             }
-            var i = 0
-            while i < n {
-                buffer[filled + i] = chunk[i]
-                i += 1
+            let at = filled
+            buffer.withUnsafeMutableBufferPointer { dst in
+                chunk.withUnsafeBufferPointer { src in
+                    var i = 0
+                    while i < n {
+                        dst[at + i] = src[i]
+                        i += 1
+                    }
+                }
             }
             filled += n
         }

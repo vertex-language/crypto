@@ -1,6 +1,7 @@
 package tls
 
 import "crypto/chacha20poly1305"
+import "crypto/cipher"
 import "crypto/subtle"
 
 public struct DecryptedRecord {
@@ -13,12 +14,25 @@ public struct DecryptedRecord {
     }
 }
 
+/// KeyLength is the AEAD key size of a TLS 1.3 cipher suite.
+public func KeyLength(_ cipherSuite: uint16) -> int {
+    return cipherSuite == TLS_AES_128_GCM_SHA256 ? 16 : 32
+}
+
+// The AEAD a record cipher seals and opens with, keyed once.
+enum recordAead {
+    case none
+    case chacha(chacha20poly1305.AEAD)
+    case gcm(cipher.GCM)
+}
+
 /// RecordCipher manages encryption and decryption of TLS 1.3 records for one direction.
 public struct RecordCipher {
     public var Key: [uint8]
     public var IV: [uint8]
     public var SequenceNumber: uint64 = 0
     public var CipherSuite: uint16 = 0x1303
+    var aead: recordAead = recordAead.none
 
     public init(key: [uint8], iv: [uint8], cipherSuite: uint16 = 0x1303) {
         self.Key = key
@@ -38,6 +52,34 @@ public struct RecordCipher {
             i -= 1
         }
         return nonce
+    }
+
+    mutating func seal(nonce: [uint8], plaintext: [uint8], additionalData: [uint8]) throws -> [uint8] {
+        try self.keyAead()
+        switch self.aead {
+        case .gcm(let g): return try g.Seal(nonce: nonce, plaintext: plaintext, additionalData: additionalData)
+        case .chacha(let c): return try c.Seal(nonce: nonce, plaintext: plaintext, additionalData: additionalData)
+        case .none: throw TlsError.unsupportedCipherSuite("\(self.CipherSuite)")
+        }
+    }
+
+    mutating func open(nonce: [uint8], ciphertextAndTag: [uint8], additionalData: [uint8]) throws -> [uint8] {
+        try self.keyAead()
+        switch self.aead {
+        case .gcm(let g): return try g.Open(nonce: nonce, ciphertextAndTag: ciphertextAndTag, additionalData: additionalData)
+        case .chacha(let c): return try c.Open(nonce: nonce, ciphertextAndTag: ciphertextAndTag, additionalData: additionalData)
+        case .none: throw TlsError.unsupportedCipherSuite("\(self.CipherSuite)")
+        }
+    }
+
+    mutating func keyAead() throws {
+        if case .none = self.aead {
+            if self.CipherSuite == TLS_AES_128_GCM_SHA256 {
+                self.aead = .gcm(try cipher.GCM.New(key: self.Key))
+            } else if self.CipherSuite == TLS_CHACHA20_POLY1305_SHA256 {
+                self.aead = .chacha(try chacha20poly1305.AEAD.New(key: self.Key))
+            }
+        }
     }
 
     /// Encrypt wraps plaintext into a TLS 1.3 protected record.
@@ -66,8 +108,7 @@ public struct RecordCipher {
         header[4] = uint8(truncatingIfNeeded: recordPayloadLen & 0xff)
 
         let nonce = ComputeNonce()
-        let aead = try chacha20poly1305.AEAD.New(key: self.Key)
-        let ciphertext = try aead.Seal(nonce: nonce, plaintext: inner, additionalData: header)
+        let ciphertext = try self.seal(nonce: nonce, plaintext: inner, additionalData: header)
 
         self.SequenceNumber &+= 1
 
@@ -95,8 +136,7 @@ public struct RecordCipher {
         }
 
         let nonce = ComputeNonce()
-        let aead = try chacha20poly1305.AEAD.New(key: self.Key)
-        let inner = try aead.Open(nonce: nonce, ciphertextAndTag: payload, additionalData: header)
+        let inner = try self.open(nonce: nonce, ciphertextAndTag: payload, additionalData: header)
 
         self.SequenceNumber &+= 1
 
@@ -110,12 +150,7 @@ public struct RecordCipher {
         }
 
         let innerType = inner[idx]
-        var realData = [uint8](repeating: 0, count: idx)
-        var i = 0
-        while i < idx {
-            realData[i] = inner[i]
-            i += 1
-        }
+        let realData = Array(inner[0..<idx])
 
         return DecryptedRecord(contentType: innerType, data: realData)
     }

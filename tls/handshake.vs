@@ -235,6 +235,9 @@ public func ParseServerHello(_ msg: [uint8]) throws -> ServerHelloInfo {
 
     // CipherSuite
     let suite = (uint16(msg[offset]) << 8) | uint16(msg[offset + 1])
+    if suite != TLS_AES_128_GCM_SHA256 && suite != TLS_CHACHA20_POLY1305_SHA256 {
+        throw TlsError.unsupportedCipherSuite("server chose \(suite), which was not offered")
+    }
     offset += 2
 
     // Legacy compression method

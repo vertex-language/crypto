@@ -103,12 +103,24 @@ public struct Digest {
     public mutating func Write(_ p: [uint8]) {
         length &+= uint64(p.count)
         var i = 0
-        while i < p.count {
-            buf.append(p[i])
+        // Top up a partial block first; then whole blocks straight from p.
+        if !buf.isEmpty {
+            while i < p.count && buf.count < BlockSize {
+                buf.append(p[i])
+                i += 1
+            }
             if buf.count == BlockSize {
-                processBlock(buf)
+                processBlocks(buf, 0, 1)
                 buf.removeAll()
             }
+        }
+        let full = (p.count - i) / BlockSize
+        if full > 0 {
+            processBlocks(p, i, full)
+            i += full * BlockSize
+        }
+        while i < p.count {
+            buf.append(p[i])
             i += 1
         }
     }
@@ -122,53 +134,58 @@ public struct Digest {
     }
 
     mutating func processBlock(_ block: [uint8]) {
+        processBlocks(block, 0, 1)
+    }
+
+    // processBlocks compresses count blocks of data from start on. The
+    // state and the schedule are locals read through pointers, so a
+    // block allocates nothing.
+    mutating func processBlocks(_ data: [uint8], _ start: int, _ count: int) {
+        var s0v = h0, s1v = h1, s2v = h2, s3v = h3
+        var s4v = h4, s5v = h5, s6v = h6, s7v = h7
         var w = [uint32](repeating: 0, count: 64)
-        var i = 0
-        while i < 16 {
-            let offset = i * 4
-            w[i] = (uint32(block[offset]) << 24) |
-                   (uint32(block[offset + 1]) << 16) |
-                   (uint32(block[offset + 2]) << 8) |
-                   uint32(block[offset + 3])
-            i += 1
+        w.withUnsafeMutableBufferPointer { wp in
+            data.withUnsafeBufferPointer { dp in
+                K.withUnsafeBufferPointer { kp in
+                    var blk = 0
+                    while blk < count {
+                        let base = start + blk * BlockSize
+                        var i = 0
+                        while i < 16 {
+                            let o = base + i * 4
+                            wp[i] = (uint32(dp[o]) << 24) | (uint32(dp[o + 1]) << 16) |
+                                    (uint32(dp[o + 2]) << 8) | uint32(dp[o + 3])
+                            i += 1
+                        }
+                        while i < 64 {
+                            wp[i] = s1(wp[i - 2]) &+ wp[i - 7] &+ s0(wp[i - 15]) &+ wp[i - 16]
+                            i += 1
+                        }
+                        var a = s0v, b = s1v, c = s2v, d = s3v
+                        var e = s4v, f = s5v, g = s6v, h = s7v
+                        var t = 0
+                        while t < 64 {
+                            let t1 = h &+ sigma1(e) &+ ch(e, f, g) &+ kp[t] &+ wp[t]
+                            let t2 = sigma0(a) &+ maj(a, b, c)
+                            h = g
+                            g = f
+                            f = e
+                            e = d &+ t1
+                            d = c
+                            c = b
+                            b = a
+                            a = t1 &+ t2
+                            t += 1
+                        }
+                        s0v &+= a; s1v &+= b; s2v &+= c; s3v &+= d
+                        s4v &+= e; s5v &+= f; s6v &+= g; s7v &+= h
+                        blk += 1
+                    }
+                }
+            }
         }
-        while i < 64 {
-            w[i] = s1(w[i - 2]) &+ w[i - 7] &+ s0(w[i - 15]) &+ w[i - 16]
-            i += 1
-        }
-
-        var a = h0
-        var b = h1
-        var c = h2
-        var d = h3
-        var e = h4
-        var f = h5
-        var g = h6
-        var h = h7
-
-        var t = 0
-        while t < 64 {
-            let t1 = h &+ sigma1(e) &+ ch(e, f, g) &+ K[t] &+ w[t]
-            let t2 = sigma0(a) &+ maj(a, b, c)
-            h = g
-            g = f
-            f = e
-            e = d &+ t1
-            d = c
-            c = b
-            b = a
-            a = t1 &+ t2
-            t += 1
-        }
-
-        h0 &+= a
-        h1 &+= b
-        h2 &+= c
-        h3 &+= d
-        h4 &+= e
-        h5 &+= f
-        h6 &+= g
-        h7 &+= h
+        h0 = s0v; h1 = s1v; h2 = s2v; h3 = s3v
+        h4 = s4v; h5 = s5v; h6 = s6v; h7 = s7v
     }
 
     /// Finalize and return the digest.

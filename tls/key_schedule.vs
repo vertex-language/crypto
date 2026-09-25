@@ -97,9 +97,10 @@ public struct KeySchedule {
         return TrafficSecrets(clientSecret: client, serverSecret: server)
     }
 
-    /// DeriveTrafficKeys derives the 32-byte key and 12-byte IV from a traffic secret.
-    public func DeriveTrafficKeys(trafficSecret: [uint8]) -> TrafficKeys {
-        let key = HkdfExpandLabel(secret: trafficSecret, label: "key", context: [], length: 32)
+    /// DeriveTrafficKeys derives the key and 12-byte IV from a traffic
+    /// secret: a 32-byte key for ChaCha20-Poly1305, 16 for AES-128-GCM.
+    public func DeriveTrafficKeys(trafficSecret: [uint8], cipherSuite: uint16 = 0x1303) -> TrafficKeys {
+        let key = HkdfExpandLabel(secret: trafficSecret, label: "key", context: [], length: KeyLength(cipherSuite))
         let iv = HkdfExpandLabel(secret: trafficSecret, label: "iv", context: [], length: 12)
         return TrafficKeys(key: key, iv: iv)
     }
