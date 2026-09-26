@@ -89,14 +89,14 @@ Run the test suite across all cryptographic packages:
 
 ```bash
 # Run all crypto tests
-vsc run tests/all/main.vs
+vsc run check
 
 # Run individual package test suites
-vsc run tests/subtle/main.vs
-vsc run tests/rand/main.vs
-vsc run tests/sha256/main.vs
-vsc run tests/hmac/main.vs
-vsc run tests/hkdf/main.vs
+vsc run test-subtle
+vsc run test-rand
+vsc run test-sha256
+vsc run test-hmac
+vsc run test-hkdf
 ```
 
 ---
