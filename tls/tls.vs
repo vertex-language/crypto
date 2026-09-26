@@ -116,9 +116,14 @@ public enum TlsError: Error {
     case recordOverflow(string)
     case closed(string)
     case alertReceived(string)
+    /// The server's certificate was refused: not trusted, not for this
+    /// host, expired, or its handshake signature did not verify.
+    case certificate(string)
 
     public var Message: string {
         switch self {
+        case .certificate(let s):
+            return "tls: certificate: \(s)"
         case .handshakeFailed(let s):
             return "tls: handshake failed: \(s)"
         case .unexpectedMessage(let s):
@@ -142,18 +147,27 @@ public enum TlsError: Error {
 /// Config configures a TLS client connection.
 public struct Config {
     public var ServerName: string
+    /// InsecureSkipVerify accepts any server: no certificate or handshake
+    /// signature is checked. Only for tests against a server you run.
     public var InsecureSkipVerify: bool
+    /// VerifyChain checks the server's certificate chain against the
+    /// system's trusted roots and ServerName (crypto/cert). Turned off, the
+    /// server still has to prove it holds its certificate's key; the caller
+    /// vets the certificate another way, as RDP does through CredSSP.
+    public var VerifyChain: bool
     public var NextProtos: [string]
     public var MinVersion: uint16
     public var MaxVersion: uint16
 
     public init(serverName: string = "",
-                insecureSkipVerify: bool = true,
+                insecureSkipVerify: bool = false,
+                verifyChain: bool = true,
                 nextProtos: [string] = [],
                 minVersion: uint16 = 0x0304,
                 maxVersion: uint16 = 0x0304) {
         self.ServerName = serverName
         self.InsecureSkipVerify = insecureSkipVerify
+        self.VerifyChain = verifyChain
         self.NextProtos = nextProtos
         self.MinVersion = minVersion
         self.MaxVersion = maxVersion
@@ -167,6 +181,9 @@ public struct ConnectionState {
     public var NegotiatedProtocol: string = ""
     public var CipherSuite: uint16 = 0
     public var Version: uint16 = 0
+    /// PeerCertificates is the server's chain as it sent it, DER, its own
+    /// certificate first.
+    public var PeerCertificates: [[uint8]] = []
 
     public init() {}
 }

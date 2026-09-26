@@ -1,7 +1,9 @@
 package main
 
-import "crypto/hkdf"
-import "crypto/sha256"
+import (
+    "crypto/hkdf"
+    "crypto/sha256"
+)
 
 var failures = 0
 

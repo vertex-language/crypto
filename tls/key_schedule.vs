@@ -1,8 +1,10 @@
 package tls
 
-import "crypto/hkdf"
-import "crypto/hmac"
-import "crypto/sha256"
+import (
+    "crypto/hkdf"
+    "crypto/hmac"
+    "crypto/sha256"
+)
 
 public struct TrafficSecrets {
     public var ClientSecret: [uint8]

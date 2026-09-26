@@ -9,12 +9,14 @@
 // mechanism can slot in beside this later behind the same interface.
 package ntlm
 
-import "crypto/md4"
-import "crypto/md5"
-import "crypto/hmac"
-import "crypto/rc4"
-import "crypto/rand"
-import "encoding/binary"
+import (
+    "crypto/hmac"
+    "crypto/md4"
+    "crypto/md5"
+    "crypto/rand"
+    "crypto/rc4"
+    "encoding/binary"
+)
 
 // Negotiate flags (MS-NLMP 2.2.2.5).
 let NEGOTIATE_UNICODE: uint32 = 0x00000001

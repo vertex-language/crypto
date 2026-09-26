@@ -1,7 +1,9 @@
 package main
 
-import "crypto/md5"
-import "crypto/hmac"
+import (
+    "crypto/hmac"
+    "crypto/md5"
+)
 
 var failures = 0
 

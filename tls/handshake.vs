@@ -1,10 +1,12 @@
 package tls
 
-import "crypto/curve25519"
-import "crypto/hmac"
-import "crypto/rand"
-import "crypto/sha256"
-import "crypto/subtle"
+import (
+    "crypto/curve25519"
+    "crypto/hmac"
+    "crypto/rand"
+    "crypto/sha256"
+    "crypto/subtle"
+)
 
 public struct ServerHelloInfo {
     public var ServerRandom: [uint8]
@@ -109,20 +111,18 @@ public func BuildClientHello(serverName: string,
     }
 
     // 6d. signature_algorithms extension (0x000d)
+    // The schemes crypto/cert verifies: what the system's own verifier knows.
+    let schemes: [uint16] = [0x0403, 0x0503, 0x0804, 0x0805, 0x0806, 0x0401, 0x0501, 0x0601]
     exts.append(0x00)
     exts.append(0x0d)
     exts.append(0x00)
-    exts.append(0x0a)
+    exts.append(uint8(truncatingIfNeeded: 2 + 2 * schemes.count))
     exts.append(0x00)
-    exts.append(0x08)
-    exts.append(0x08)
-    exts.append(0x07) // ed25519
-    exts.append(0x04)
-    exts.append(0x03) // ecdsa_secp256r1_sha256
-    exts.append(0x08)
-    exts.append(0x04) // rsa_pss_rsae_sha256
-    exts.append(0x04)
-    exts.append(0x01) // rsa_pkcs1_sha256
+    exts.append(uint8(truncatingIfNeeded: 2 * schemes.count))
+    for scheme in schemes {
+        exts.append(uint8(truncatingIfNeeded: scheme >> 8))
+        exts.append(uint8(truncatingIfNeeded: scheme))
+    }
 
     // 6e. server_name (SNI) extension (0x0000)
     if !serverName.isEmpty {

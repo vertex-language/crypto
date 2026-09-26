@@ -1,6 +1,8 @@
 package main
-import "crypto/x509"
-import "crypto/sha256"
+import (
+    "crypto/sha256"
+    "crypto/x509"
+)
 var failures = 0
 func check(_ ok: bool, _ m: string) { if ok { print("ok    \(m)") } else { print("FAIL  \(m)"); failures += 1 } }
 func main() -> int32 {

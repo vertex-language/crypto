@@ -1,7 +1,9 @@
 package main
 
-import "crypto/sha1"
-import "crypto/hmac"
+import (
+    "crypto/hmac"
+    "crypto/sha1"
+)
 
 var failures = 0
 

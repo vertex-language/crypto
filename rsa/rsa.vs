@@ -4,10 +4,12 @@
 // is no secret to protect and the code need not be constant-time.
 package rsa
 
-import "math/big"
-import "crypto/sha256"
-import "crypto/sha512"
-import "crypto/sha1"
+import (
+    "crypto/sha1"
+    "crypto/sha256"
+    "crypto/sha512"
+    "math/big"
+)
 
 /// PublicKey is an RSA public key: modulus N and exponent E.
 public struct PublicKey {

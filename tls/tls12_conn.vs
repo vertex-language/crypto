@@ -1,13 +1,15 @@
 package tls
 
-import "net/tcp"
-import "crypto/rand"
-import "crypto/curve25519"
-import "crypto/cipher"
-import "crypto/sha256"
-import "crypto/sha512"
-import "crypto/x509"
-import "crypto/rsa"
+import (
+    "crypto/cipher"
+    "crypto/curve25519"
+    "crypto/rand"
+    "crypto/rsa"
+    "crypto/sha256"
+    "crypto/sha512"
+    "crypto/x509"
+    "net/tcp"
+)
 
 let recTypeChangeCipherSpec: uint8 = 20
 let recTypeAlert: uint8 = 21
@@ -41,6 +43,8 @@ public struct Conn12 {
     /// trust policy (CredSSP also binds to its public key).
     public var PeerCertificate: x509.Certificate = x509.Certificate()
     public var PeerCertificateDER: [uint8] = []
+    /// PeerCertificates is the server's chain, DER, its own certificate first.
+    public var PeerCertificates: [[uint8]] = []
     public var Handshaked: bool = false
 
     public init(stream: tcp.TcpStream, config: Config) {

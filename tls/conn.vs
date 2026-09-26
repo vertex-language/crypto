@@ -1,9 +1,11 @@
 package tls
 
-import "net/tcp"
-import "crypto/curve25519"
-import "crypto/rand"
-import "crypto/subtle"
+import (
+    "crypto/curve25519"
+    "crypto/rand"
+    "crypto/subtle"
+    "net/tcp"
+)
 
 /// Conn represents an established or in-progress TLS 1.3 encrypted connection over TCP.
 public struct Conn {
@@ -106,6 +108,10 @@ public struct Conn {
         // 8. Read encrypted handshake records until Finished (type 20)
         var serverFinishedReceived = false
         var hsBuf: [uint8] = []
+        // The server's chain, and whether it has signed the handshake with
+        // its certificate's key.
+        var peerChain: [[uint8]] = []
+        var serverProvedKey = false
 
         while !serverFinishedReceived {
             try await self.stream.ReadFull(into: &header)
@@ -166,10 +172,26 @@ public struct Conn {
                     }
                     transcript.Update(fullMsg)
                 } else if msgType == HandshakeCertificate {
+                    peerChain = try parseCertificateList13(fullMsg)
+                    try verifyChain(peerChain, self.config)
+                    self.state.PeerCertificates = peerChain
                     transcript.Update(fullMsg)
                 } else if msgType == HandshakeCertificateVerify {
+                    if !self.config.InsecureSkipVerify {
+                        if peerChain.isEmpty {
+                            throw TlsError.certificate("CertificateVerify before Certificate")
+                        }
+                        let cv = try parseCertificateVerify(fullMsg)
+                        try verifyHandshakeSignature(peerChain[0], scheme: cv.scheme,
+                                                     data: serverSignedContent(transcript.CurrentHash()),
+                                                     signature: cv.signature)
+                        serverProvedKey = true
+                    }
                     transcript.Update(fullMsg)
                 } else if msgType == HandshakeFinished {
+                    if !self.config.InsecureSkipVerify && !serverProvedKey {
+                        throw TlsError.certificate("the server finished without proving it holds its certificate's key")
+                    }
                     var serverVerifyData = [uint8](repeating: 0, count: msgLen)
                     var v = 0
                     while v < msgLen {

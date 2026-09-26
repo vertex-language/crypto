@@ -1,8 +1,10 @@
 package main
 
-import "crypto/tls"
-import "crypto/subtle"
-import "crypto/sha256"
+import (
+    "crypto/sha256"
+    "crypto/subtle"
+    "crypto/tls"
+)
 
 var failures = 0
 

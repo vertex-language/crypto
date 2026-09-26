@@ -1,8 +1,10 @@
 package credssp
 
-import "crypto/tls"
-import "encoding/asn1"
-import "encoding/binary"
+import (
+    "crypto/tls"
+    "encoding/asn1"
+    "encoding/binary"
+)
 
 struct tsResponse {
     var negoToken: [uint8]

@@ -1,6 +1,8 @@
 package main
-import "crypto/ntlm"
-import "crypto/hmac"
+import (
+    "crypto/hmac"
+    "crypto/ntlm"
+)
 var failures = 0
 func check(_ ok: bool, _ m: string) { if ok { print("ok    \(m)") } else { print("FAIL  \(m)"); failures += 1 } }
 func hex(_ b: [uint8]) -> string {

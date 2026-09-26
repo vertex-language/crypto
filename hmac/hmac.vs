@@ -1,10 +1,12 @@
 package hmac
 
-import "crypto/sha256"
-import "crypto/sha1"
-import "crypto/md5"
-import "crypto/sha512"
-import "crypto/subtle"
+import (
+    "crypto/md5"
+    "crypto/sha1"
+    "crypto/sha256"
+    "crypto/sha512"
+    "crypto/subtle"
+)
 
 public enum HashAlgorithm {
     case sha256

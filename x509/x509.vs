@@ -4,10 +4,12 @@
 // certificate's signature. It is not a full path validator yet.
 package x509
 
-import "encoding/asn1"
-import "crypto/rsa"
-import "crypto/sha1"
-import "crypto/sha256"
+import (
+    "crypto/rsa"
+    "crypto/sha1"
+    "crypto/sha256"
+    "encoding/asn1"
+)
 
 public enum X509Error: Error {
     case parse(string)

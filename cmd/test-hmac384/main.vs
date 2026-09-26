@@ -1,6 +1,8 @@
 package main
-import "crypto/hmac"
-import "crypto/sha512"
+import (
+    "crypto/hmac"
+    "crypto/sha512"
+)
 func main() -> int32 {
     let key = [uint8](repeating: 0x0b, count: 20)
     let data: [uint8] = [0x48,0x69,0x20,0x54,0x68,0x65,0x72,0x65]

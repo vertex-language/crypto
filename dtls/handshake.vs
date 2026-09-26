@@ -1,10 +1,12 @@
 package dtls
 
-import "crypto/curve25519"
-import "crypto/hkdf"
-import "crypto/hmac"
-import "crypto/rand"
-import "crypto/sha256"
+import (
+    "crypto/curve25519"
+    "crypto/hkdf"
+    "crypto/hmac"
+    "crypto/rand"
+    "crypto/sha256"
+)
 
 /// DtlsHandshakeMessage represents a parsed DTLS handshake message.
 public struct DtlsHandshakeMessage {

@@ -28,7 +28,8 @@ All packages in this repository are organized as directory packages (`crypto/<pk
 - **`crypto/ecdsa`**: Elliptic Curve Digital Signature Algorithm (FIPS 186-4).
 - **`crypto/rsa`**: RSA PKCS #1 v1.5 and PSS signatures / OAEP encryption.
 - **`crypto/tls`**: Transport Layer Security 1.3 client and server implementation (RFC 8446).
-- **`crypto/x509`**: X.509 public key certificates, CRLs, and trust chain validation.
+- **`crypto/x509`**: X.509 certificate parsing (RSA keys, names, validity) and RSA signature checks.
+- **`crypto/cert`**: the operating system's certificate trust: chains against the system's roots and a host name, and signatures (ECDSA, RSA-PSS, PKCS#1) by a certificate's key. `crypto/tls` verifies servers with it by default.
 
 For the comprehensive design document and Golang equivalence map, see [docs/proposed.md](docs/proposed.md).
 
@@ -36,10 +37,18 @@ For the comprehensive design document and Golang equivalence map, see [docs/prop
 
 ## Quick Start
 
-Run any entry point with:
+Run the test suite or any tool in `cmd/` with `vsc run`:
 
 ```bash
-vsc run main.vs
+# Run all crypto tests
+vsc run check
+
+# Run individual package test suites
+vsc run test-sha256
+vsc run test-tls
+vsc run test-rand
+vsc run test-cert          # offline: signatures and broken chains
+vsc run test-cert-live     # real servers, verified
 ```
 
 ### SHA-256 Digest
@@ -62,9 +71,11 @@ func main() -> int32 {
 ```swift
 package main
 
-import "crypto/hmac"
-import "crypto/hkdf"
-import "crypto/sha256"
+import (
+    "crypto/hkdf"
+    "crypto/hmac"
+    "crypto/sha256"
+)
 
 func main() -> int32 {
     let secret = [uint8](repeating: 0x42, count: 32)

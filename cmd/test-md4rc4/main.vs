@@ -1,6 +1,8 @@
 package main
-import "crypto/md4"
-import "crypto/rc4"
+import (
+    "crypto/md4"
+    "crypto/rc4"
+)
 var failures = 0
 func check(_ ok: bool, _ m: string) { if ok { print("ok    \(m)") } else { print("FAIL  \(m)"); failures += 1 } }
 func hex(_ b: [uint8]) -> string {

@@ -1,7 +1,9 @@
 package main
-import "crypto/ntlm"
-import "crypto/md4"
-import "encoding/binary"
+import (
+    "crypto/md4"
+    "crypto/ntlm"
+    "encoding/binary"
+)
 var failures = 0
 func check(_ ok: bool, _ m: string) { if ok { print("ok    \(m)") } else { print("FAIL  \(m)"); failures += 1 } }
 func hex(_ b: [uint8]) -> string {

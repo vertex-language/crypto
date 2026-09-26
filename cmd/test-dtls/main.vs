@@ -1,7 +1,9 @@
 package main
 
-import "crypto/dtls"
-import "crypto/sha256"
+import (
+    "crypto/dtls"
+    "crypto/sha256"
+)
 
 var failures = 0
 

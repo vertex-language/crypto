@@ -10,12 +10,14 @@
 // Kerberos can be added later without changing this flow.
 package credssp
 
-import "net/tcp"
-import "crypto/tls"
-import "crypto/ntlm"
-import "crypto/sha256"
-import "crypto/rand"
-import "encoding/asn1"
+import (
+    "crypto/ntlm"
+    "crypto/rand"
+    "crypto/sha256"
+    "crypto/tls"
+    "encoding/asn1"
+    "net/tcp"
+)
 
 public enum CredSSPError: Error {
     case protocolError(string)

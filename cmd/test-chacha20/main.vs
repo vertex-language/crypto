@@ -1,7 +1,9 @@
 package main
 
-import "crypto/chacha20"
-import "encoding/hex"
+import (
+    "crypto/chacha20"
+    "encoding/hex"
+)
 
 var failures = 0
 

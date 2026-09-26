@@ -1,8 +1,10 @@
 package chacha20poly1305
 
-import "crypto/chacha20"
-import "crypto/poly1305"
-import "crypto/subtle"
+import (
+    "crypto/chacha20"
+    "crypto/poly1305"
+    "crypto/subtle"
+)
 
 public let KeySize: int = 32
 public let NonceSize: int = 12

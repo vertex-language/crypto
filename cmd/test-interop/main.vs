@@ -1,7 +1,9 @@
 package main
 
-import "crypto/sha256"
-import "encoding/hex"
+import (
+    "crypto/sha256"
+    "encoding/hex"
+)
 
 func main() -> int32 {
     let digest = sha256.Sum256("hello vertex ecosystem")

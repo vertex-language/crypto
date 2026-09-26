@@ -1,7 +1,9 @@
 package main
 
-import "crypto/curve25519"
-import "encoding/hex"
+import (
+    "crypto/curve25519"
+    "encoding/hex"
+)
 
 var failures = 0
 

@@ -1,20 +1,22 @@
 package main
 
-import "crypto/subtle"
-import "crypto/rand"
-import "crypto/sha256"
-import "crypto/hmac"
-import "crypto/hkdf"
-import "crypto/chacha20"
-import "crypto/poly1305"
-import "crypto/chacha20poly1305"
-import "crypto/curve25519"
-import "crypto/tls"
-import "crypto/sha1"
-import "crypto/crc32"
-import "crypto/md5"
-import "crypto/dtls"
-import "encoding/hex"
+import (
+    "crypto/chacha20"
+    "crypto/chacha20poly1305"
+    "crypto/crc32"
+    "crypto/curve25519"
+    "crypto/dtls"
+    "crypto/hkdf"
+    "crypto/hmac"
+    "crypto/md5"
+    "crypto/poly1305"
+    "crypto/rand"
+    "crypto/sha1"
+    "crypto/sha256"
+    "crypto/subtle"
+    "crypto/tls"
+    "encoding/hex"
+)
 
 var failures = 0
 

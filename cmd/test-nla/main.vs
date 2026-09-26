@@ -1,8 +1,10 @@
 package main
-import "net/tcp"
-import "crypto/tls"
-import "crypto/credssp"
-import "os/env"
+import (
+    "crypto/credssp"
+    "crypto/tls"
+    "net/tcp"
+    "os/env"
+)
 
 func main() async -> int32 {
     guard let host = env.Get("RDP_HOST"), !host.isEmpty else {

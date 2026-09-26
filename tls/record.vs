@@ -1,8 +1,10 @@
 package tls
 
-import "crypto/chacha20poly1305"
-import "crypto/cipher"
-import "crypto/subtle"
+import (
+    "crypto/chacha20poly1305"
+    "crypto/cipher"
+    "crypto/subtle"
+)
 
 public struct DecryptedRecord {
     public var ContentType: uint8

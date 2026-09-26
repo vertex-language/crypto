@@ -1,7 +1,9 @@
 package tls
 
-import "crypto/x509"
-import "crypto/rsa"
+import (
+    "crypto/rsa"
+    "crypto/x509"
+)
 
 // buildClientHello constructs a TLS 1.2 ClientHello offering ECDHE_RSA
 // AES-GCM suites and X25519, with SNI, signature_algorithms, extended
@@ -98,18 +100,34 @@ func (c: inout Conn12) parseServerHello(_ body: [uint8]) throws -> [uint8] {
     return serverRandom
 }
 
-// parseCertificate parses the leaf certificate from the Certificate message.
+// parseCertificate reads the Certificate message's chain, checks it
+// against the system's roots unless the configuration leaves that to the
+// caller, and parses the server's own certificate, whose key signs the
+// ServerKeyExchange.
 func (c: inout Conn12) parseCertificate(_ body: [uint8]) throws {
     if body.count < 6 { throw Tls12Error.handshake("short Certificate") }
-    // total list length (3), then first cert length (3) + der
-    let firstLen = (int(body[3]) << 16) | (int(body[4]) << 8) | int(body[5])
-    if 6 + firstLen > body.count { throw Tls12Error.handshake("Certificate truncated") }
-    var der: [uint8] = []
-    var i = 0
-    while i < firstLen { der.append(body[6 + i]); i += 1 }
-    c.PeerCertificateDER = der
+    // total list length (3), then entries of length (3) + der
+    let listEnd = 3 + ((int(body[0]) << 16) | (int(body[1]) << 8) | int(body[2]))
+    if listEnd > body.count { throw Tls12Error.handshake("Certificate truncated") }
+    var chain: [[uint8]] = []
+    var off = 3
+    while off + 3 <= listEnd {
+        let n = (int(body[off]) << 16) | (int(body[off + 1]) << 8) | int(body[off + 2])
+        off += 3
+        if off + n > listEnd { throw Tls12Error.handshake("Certificate truncated") }
+        chain.append(Array(body[off..<(off + n)]))
+        off += n
+    }
+    if chain.isEmpty { throw Tls12Error.handshake("the server sent no certificate") }
     do {
-        c.PeerCertificate = try x509.Parse(der)
+        try verifyChain(chain, c.config)
+    } catch let e as TlsError {
+        throw Tls12Error.verify(e.Message)
+    }
+    c.PeerCertificates = chain
+    c.PeerCertificateDER = chain[0]
+    do {
+        c.PeerCertificate = try x509.Parse(chain[0])
     } catch {
         throw Tls12Error.handshake("certificate parse failed")
     }

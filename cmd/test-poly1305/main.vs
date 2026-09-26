@@ -1,7 +1,9 @@
 package main
 
-import "crypto/poly1305"
-import "encoding/hex"
+import (
+    "crypto/poly1305"
+    "encoding/hex"
+)
 
 var failures = 0
 

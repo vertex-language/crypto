@@ -10,15 +10,17 @@
 // its public key, and the ServerKeyExchange signature is verified.
 package tls
 
-import "net/tcp"
-import "crypto/rand"
-import "crypto/curve25519"
-import "crypto/cipher"
-import "crypto/hmac"
-import "crypto/sha256"
-import "crypto/sha512"
-import "crypto/x509"
-import "crypto/rsa"
+import (
+    "crypto/cipher"
+    "crypto/curve25519"
+    "crypto/hmac"
+    "crypto/rand"
+    "crypto/rsa"
+    "crypto/sha256"
+    "crypto/sha512"
+    "crypto/x509"
+    "net/tcp"
+)
 
 // Cipher suites we offer (ECDHE_RSA + AES-GCM).
 let suiteECDHE_RSA_AES256_GCM_SHA384: uint16 = 0xC030
