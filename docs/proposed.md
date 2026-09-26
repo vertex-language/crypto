@@ -14,7 +14,7 @@ https://github.com/vertex-language/crypto
 
 ### Pure Folder-Based Packages (Golang Style)
 Vertex supports folder-based package resolution without manifest files:
-- **No `package.vs` needed**: Because cryptographic algorithms are pure mathematical transformations on in-memory byte buffers (`[uint8]`), they compile directly from pure `.vs` source files.
+- **No manifest**: Because cryptographic algorithms are pure mathematical transformations on in-memory byte buffers (`[uint8]`), each folder is a package of pure `.vs` source, and a `vs.mod` at the repository root names the module.
 - **Top-level package declarations**: Each folder contains `.vs` files starting with `package <name>`.
 - **URL path mapping**:
   ```swift
