@@ -49,8 +49,13 @@ func main() async -> int32 {
         let err = await handshake(host, tls12: false)
         check(err.isEmpty, "TLS 1.3 to \(host) verifies" + (err.isEmpty ? "" : ": \(err)"))
     }
-    let err12 = await handshake("huggingface.co", tls12: true)
-    check(err12.isEmpty, "TLS 1.2 to huggingface.co verifies" + (err12.isEmpty ? "" : ": \(err12)"))
+    // huggingface.co signs its ServerKeyExchange with RSA, cloudflare.com
+    // with ECDSA. (github.com is ECDSA too, but its TLS 1.2 wants P-256 key
+    // exchange, which Conn12 does not offer.)
+    for host in ["huggingface.co", "cloudflare.com"] {
+        let err = await handshake(host, tls12: true)
+        check(err.isEmpty, "TLS 1.2 to \(host) verifies" + (err.isEmpty ? "" : ": \(err)"))
+    }
 
     // A real chain, checked for a name it is not for.
     do {

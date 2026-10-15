@@ -22,7 +22,9 @@ import (
     "net/tcp"
 )
 
-// Cipher suites we offer (ECDHE_RSA + AES-GCM).
+// Cipher suites we offer (ECDHE_ECDSA and ECDHE_RSA + AES-GCM).
+let suiteECDHE_ECDSA_AES256_GCM_SHA384: uint16 = 0xC02C
+let suiteECDHE_ECDSA_AES128_GCM_SHA256: uint16 = 0xC02B
 let suiteECDHE_RSA_AES256_GCM_SHA384: uint16 = 0xC030
 let suiteECDHE_RSA_AES128_GCM_SHA256: uint16 = 0xC02F
 

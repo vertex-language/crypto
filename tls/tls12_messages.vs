@@ -1,13 +1,10 @@
 package tls
 
-import (
-    "crypto/rsa"
-    "crypto/x509"
-)
+import "crypto/x509"
 
-// buildClientHello constructs a TLS 1.2 ClientHello offering ECDHE_RSA
-// AES-GCM suites and X25519, with SNI, signature_algorithms, extended
-// master secret and (empty) renegotiation_info.
+// buildClientHello constructs a TLS 1.2 ClientHello offering ECDHE_ECDSA
+// and ECDHE_RSA AES-GCM suites and X25519, with SNI, signature_algorithms,
+// extended master secret and (empty) renegotiation_info.
 func buildClientHello(serverName: string, clientRandom: [uint8], keyShare: [uint8]) -> [uint8] {
     var b: [uint8] = []
     // client_version = TLS 1.2
@@ -17,8 +14,10 @@ func buildClientHello(serverName: string, clientRandom: [uint8], keyShare: [uint
     // session_id (empty)
     b.append(0x00)
     // cipher_suites
-    b.append(0x00); b.append(0x04)
+    b.append(0x00); b.append(0x08)
+    b.append(0xC0); b.append(0x2C)   // ECDHE_ECDSA_AES256_GCM_SHA384
     b.append(0xC0); b.append(0x30)   // ECDHE_RSA_AES256_GCM_SHA384
+    b.append(0xC0); b.append(0x2B)   // ECDHE_ECDSA_AES128_GCM_SHA256
     b.append(0xC0); b.append(0x2F)   // ECDHE_RSA_AES128_GCM_SHA256
     // compression: null only
     b.append(0x01); b.append(0x00)
@@ -48,7 +47,7 @@ func buildClientHello(serverName: string, clientRandom: [uint8], keyShare: [uint
     appendExtension(&ext, 0x000b, [0x01, 0x00])
     // signature_algorithms (0x000d)
     var sigs: [uint8] = []
-    let schemes: [uint16] = [0x0804, 0x0805, 0x0501, 0x0401, 0x0403, 0x0201]
+    let schemes: [uint16] = [0x0403, 0x0804, 0x0401, 0x0503, 0x0805, 0x0501, 0x0603, 0x0806, 0x0601]
     sigs.append(uint8(truncatingIfNeeded: (schemes.count * 2) >> 8))
     sigs.append(uint8(truncatingIfNeeded: schemes.count * 2))
     for s in schemes {
@@ -90,9 +89,9 @@ func (c: inout Conn12) parseServerHello(_ body: [uint8]) throws -> [uint8] {
     off += 2
     // compression method (1) then optional extensions -- not needed.
     c.suite = suite
-    if suite == suiteECDHE_RSA_AES256_GCM_SHA384 {
+    if suite == suiteECDHE_RSA_AES256_GCM_SHA384 || suite == suiteECDHE_ECDSA_AES256_GCM_SHA384 {
         c.useSHA384 = true; c.keyLen = 32
-    } else if suite == suiteECDHE_RSA_AES128_GCM_SHA256 {
+    } else if suite == suiteECDHE_RSA_AES128_GCM_SHA256 || suite == suiteECDHE_ECDSA_AES128_GCM_SHA256 {
         c.useSHA384 = false; c.keyLen = 16
     } else {
         throw Tls12Error.handshake("server chose unsupported suite \(suite)")
@@ -177,30 +176,16 @@ func (c: inout Conn12) parseServerKeyExchange(_ body: [uint8], clientRandom: [ui
         return serverPub
     }
 
+    // The two bytes are a SignatureScheme (RFC 8446 4.2.3), which TLS 1.2's
+    // SignatureAndHashAlgorithm pairs are a subset of. SHA-1 is refused.
+    let scheme = (uint16(hashByte) << 8) | uint16(sigByte)
+    if hashByte == 0x02 {
+        throw Tls12Error.verify("ServerKeyExchange signed with SHA-1 (scheme \(scheme))")
+    }
     do {
-        if hashByte == 0x08 {
-            // New-style SignatureScheme in the two bytes (PSS/EdDSA family).
-            let scheme = (uint16(hashByte) << 8) | uint16(sigByte)
-            let h: rsa.Hash = scheme == 0x0805 ? .sha384 : .sha256
-            try rsa.VerifyPSS(key: c.PeerCertificate.RSAPublicKey, hash: h, data: signed, signature: signature)
-        } else if sigByte == 0x01 {
-            let h = rsaHashFromByte(hashByte)
-            try rsa.VerifyPKCS1v15(key: c.PeerCertificate.RSAPublicKey, hash: h, data: signed, signature: signature)
-        } else {
-            throw Tls12Error.verify("unsupported SKE signature algorithm (\(hashByte),\(sigByte))")
-        }
-    } catch let e as rsa.RsaError {
-        throw Tls12Error.verify("ServerKeyExchange signature: \(e.Message)")
+        try verifyHandshakeSignature(c.PeerCertificateDER, scheme: scheme, data: signed, signature: signature)
+    } catch let e as TlsError {
+        throw Tls12Error.verify(e.Message)
     }
     return serverPub
-}
-
-func rsaHashFromByte(_ b: uint8) -> rsa.Hash {
-    switch b {
-    case 2: return .sha1
-    case 4: return .sha256
-    case 5: return .sha384
-    case 6: return .sha512
-    default: return .sha256
-    }
 }
