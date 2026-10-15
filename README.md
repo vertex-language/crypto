@@ -25,11 +25,11 @@ All packages in this repository are organized as directory packages (`crypto/<pk
 - **`crypto/curve25519`**: X25519 Montgomery curve scalar multiplication (RFC 7748).
 - **`crypto/ecdh`**: Elliptic Curve Diffie-Hellman key exchange (X25519, P-256, P-384).
 - **`crypto/ed25519`**: Ed25519 digital signature algorithm (RFC 8032).
-- **`crypto/ecdsa`**: Elliptic Curve Digital Signature Algorithm (FIPS 186-4).
+- **`crypto/ecdsa`**: ECDSA signature verification on P-256, P-384 and P-521 (FIPS 186-5).
 - **`crypto/rsa`**: RSA PKCS #1 v1.5 and PSS signatures / OAEP encryption.
 - **`crypto/tls`**: Transport Layer Security 1.3 client and server implementation (RFC 8446).
-- **`crypto/x509`**: X.509 certificate parsing (RSA keys, names, validity) and RSA signature checks.
-- **`crypto/cert`**: the operating system's certificate trust: chains against the system's roots and a host name, and signatures (ECDSA, RSA-PSS, PKCS#1) by a certificate's key. `crypto/tls` verifies servers with it by default.
+- **`crypto/x509`**: X.509 certificate parsing (RSA and ECDSA keys, names, validity, extensions) and chain verification to a pool of roots.
+- **`crypto/cert`**: the operating system's certificate trust: chains against the system's roots and a host name, and signatures (ECDSA, RSA-PSS, PKCS#1) by a certificate's key. On Linux the roots are the distribution's bundle and `crypto/x509` verifies, as in Go. `crypto/tls` verifies servers with it by default.
 
 For the comprehensive design document and Golang equivalence map, see [docs/proposed.md](docs/proposed.md).
 
@@ -47,6 +47,7 @@ vsc run check
 vsc run test-sha256
 vsc run test-tls
 vsc run test-rand
+vsc run test-ecdsa         # the curves' constants and malformed signatures
 vsc run test-cert          # offline: signatures and broken chains
 vsc run test-cert-live     # real servers, verified
 ```

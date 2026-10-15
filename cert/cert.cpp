@@ -11,6 +11,9 @@
 //   Windows: crypt32 (CertGetCertificateChain, the SSL chain policy) and
 //            CNG (BCryptVerifySignature)
 //   Android: not yet: its trust store is reached through Java
+//   Linux:   no C++ at all: there is no one system verifier to call, so,
+//            as Go does, the Vertex side (cert_linux.vs) reads the
+//            distribution's root bundle and verifies with crypto/x509
 module;
 #include <stdint.h>
 #include <string_view>
@@ -27,6 +30,7 @@ export namespace Code {
     constexpr int32_t invalid = -6;      // a certificate that does not parse
 }
 
+#if !defined(__linux__) || defined(__ANDROID__)
 // certVerifyChain checks a chain: count certificates, DER, concatenated in
 // ders with their lengths in lengths, the server's own first. host is the
 // name the client asked for; empty checks the chain without a name.
@@ -44,3 +48,4 @@ export int32_t certVerifySignature(const uint8_t* der, int64_t derLength, int32_
 // certLastError copies the system's words for the calling thread's last
 // failure into out, up to capacity bytes, and returns how many it wrote.
 export int64_t certLastError(uint8_t* out, int64_t capacity) noexcept;
+#endif

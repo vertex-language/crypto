@@ -5,6 +5,9 @@
 // the user's and the administrator's trust settings, and checks validity
 // and names, so a Vertex program trusts exactly what the rest of the
 // machine does -- a corporate root included -- and ships no root list.
+// Linux has no one system verifier, so there, as in Go, the roots are the
+// distribution's bundle (/etc/ssl/certs/ca-certificates.crt and the like,
+// or $SSL_CERT_FILE) and crypto/x509 verifies.
 //
 //     try cert.VerifyChain(chain, host: "huggingface.co")
 //     try cert.VerifySignature(certificate: chain[0], scheme: cert.Scheme.ecdsaP256SHA256,
@@ -61,6 +64,19 @@ public func VerifyChain(_ chain: [[uint8]], host: string) throws {
     if chain.isEmpty {
         throw CertError.invalid("no certificates")
     }
+    try systemVerifyChain(chain, host: host)
+}
+
+/// VerifySignature checks signature over data with the public key of
+/// certificate, a DER certificate, by TLS signature scheme (see Scheme).
+public func VerifySignature(certificate: [uint8], scheme: uint16, data: [uint8], signature: [uint8]) throws {
+    try systemVerifySignature(certificate: certificate, scheme: scheme, data: data, signature: signature)
+}
+
+// The operating system's verifier, through the C++ module (cert.cpp). On
+// Linux the verifier is Vertex's own: see cert_linux.vs.
+#if !os(Linux)
+func systemVerifyChain(_ chain: [[uint8]], host: string) throws {
     var ders: [uint8] = []
     var lengths: [int64] = []
     for der in chain {
@@ -75,9 +91,7 @@ public func VerifyChain(_ chain: [[uint8]], host: string) throws {
     try check(code)
 }
 
-/// VerifySignature checks signature over data with the public key of
-/// certificate, a DER certificate, by TLS signature scheme (see Scheme).
-public func VerifySignature(certificate: [uint8], scheme: uint16, data: [uint8], signature: [uint8]) throws {
+func systemVerifySignature(certificate: [uint8], scheme: uint16, data: [uint8], signature: [uint8]) throws {
     let code = certificate.withUnsafeBufferPointer { c in
         data.withUnsafeBufferPointer { d in
             signature.withUnsafeBufferPointer { s in
@@ -106,3 +120,4 @@ func check(_ code: int32) throws {
     default: throw CertError.untrusted(why)
     }
 }
+#endif

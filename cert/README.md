@@ -1,6 +1,6 @@
 # crypto/cert
 
-Answers two questions with the operating system's own certificate trust: does a server's chain lead to a root this machine trusts, for the host the client asked for; and does a signature verify under a certificate's public key.
+Answers two questions with the operating system's own certificate trust: does a server's chain lead to a root this machine trusts, for the host the client asked for; and does a signature verify under a certificate's public key. On Linux, which has no one system verifier, the roots are the distribution's bundle (`/etc/ssl/certs/ca-certificates.crt` and the like, or `$SSL_CERT_FILE`) and `crypto/x509` verifies, as Go does.
 
 ```vertex
 import "crypto/cert"
