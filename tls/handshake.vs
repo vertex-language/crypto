@@ -59,13 +59,18 @@ public func BuildClientHello(serverName: string,
         s += 1
     }
 
-    // 4. Cipher suites: TLS_CHACHA20_POLY1305_SHA256 (0x1303) and TLS_AES_128_GCM_SHA256 (0x1301)
+    // 4. Cipher suites: TLS_AES_128_GCM_SHA256 (0x1301) and
+    // TLS_CHACHA20_POLY1305_SHA256 (0x1303), the faster one here first.
+    // Servers follow the client's order, so this decides the suite: AES-GCM
+    // on the processor's AES and carry-less multiply runs well past
+    // ChaCha20, and without them ChaCha20 runs well past AES's tables.
+    let aesFirst = CPU.hasAES && CPU.hasCLMUL
     body.append(0x00)
     body.append(0x04)
     body.append(0x13)
-    body.append(0x03)
+    body.append(aesFirst ? 0x01 : 0x03)
     body.append(0x13)
-    body.append(0x01)
+    body.append(aesFirst ? 0x03 : 0x01)
 
     // 5. Legacy compression methods: 1 byte length (1), 0x00 (null compression)
     body.append(0x01)
