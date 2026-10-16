@@ -141,6 +141,25 @@ public struct Digest {
     // state and the schedule are locals read through pointers, so a
     // block allocates nothing.
     mutating func processBlocks(_ data: [uint8], _ start: int, _ count: int) {
+        if CPU.hasSHA256 {
+            var st: [v128] = [v128(h0, h1, h2, h3), v128(h4, h5, h6, h7)]
+            st.withUnsafeMutableBufferPointer { sp in
+                data.withUnsafeBufferPointer { dp in
+                    kv.withUnsafeBufferPointer { kp in
+                        blocksHW(sp.baseAddress!, dp.baseAddress! + start, count, kp.baseAddress!)
+                    }
+                }
+            }
+            h0 = v128I32x4ExtractLane(st[0], 0)
+            h1 = v128I32x4ExtractLane(st[0], 1)
+            h2 = v128I32x4ExtractLane(st[0], 2)
+            h3 = v128I32x4ExtractLane(st[0], 3)
+            h4 = v128I32x4ExtractLane(st[1], 0)
+            h5 = v128I32x4ExtractLane(st[1], 1)
+            h6 = v128I32x4ExtractLane(st[1], 2)
+            h7 = v128I32x4ExtractLane(st[1], 3)
+            return
+        }
         var s0v = h0, s1v = h1, s2v = h2, s3v = h3
         var s4v = h4, s5v = h5, s6v = h6, s7v = h7
         var w = [uint32](repeating: 0, count: 64)

@@ -35,6 +35,14 @@ public struct Block {
         expandKey(key)
     }
 
+    /// RoundKeys is the expanded key, four words a round, each word its
+    /// four bytes read big-endian: what a hardware path loads its round
+    /// keys from.
+    public var RoundKeys: [uint32] { return enc }
+
+    /// Rounds is 10 for AES-128 and 14 for AES-256.
+    public var Rounds: int { return rounds }
+
     mutating func expandKey(_ key: [uint8]) {
         let nk = key.count / 4
         let total = (rounds + 1) * 4

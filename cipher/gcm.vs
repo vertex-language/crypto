@@ -30,6 +30,9 @@ public struct GCM {
     // generic GCM does).
     var tableHi: [uint64]
     var tableLo: [uint64]
+    // The instructions' state, where the processor has AES and CLMUL; nil
+    // where it does not, and the tables are used instead.
+    var hw: gcmHW?
 
     public init(_ block: aes.Block) {
         self.block = block
@@ -56,6 +59,10 @@ public struct GCM {
         }
         self.tableHi = hi
         self.tableLo = lo
+        self.hw = nil
+        if CPU.hasAES && CPU.hasCLMUL {
+            self.hw = newGCMHW(block)
+        }
     }
 
     public static func New(key: [uint8]) throws -> GCM {
@@ -68,6 +75,9 @@ public struct GCM {
     public func Seal(nonce: [uint8], plaintext: [uint8], additionalData: [uint8] = []) throws -> [uint8] {
         if nonce.count != GCMNonceSize {
             throw CipherError.badParameter("GCM nonce must be 12 bytes")
+        }
+        if let g = hw {
+            return sealHW(g, nonce, plaintext, additionalData)
         }
         let n0 = be32(nonce, 0)
         let n1 = be32(nonce, 4)
@@ -89,6 +99,12 @@ public struct GCM {
         }
         if ciphertextAndTag.count < GCMTagSize {
             throw CipherError.authFailed
+        }
+        if let g = hw {
+            guard let plain = openHW(g, nonce, ciphertextAndTag, additionalData) else {
+                throw CipherError.authFailed
+            }
+            return plain
         }
         let clen = ciphertextAndTag.count - GCMTagSize
         let n0 = be32(nonce, 0)
@@ -225,26 +241,16 @@ func mulH(_ y0: inout uint64, _ y1: inout uint64, _ th: UnsafePointer<uint64>, _
 }
 
 // reduction is Go's gcmReductionTable: what x^4 times each nibble that
-// shifts off the end contributes back, in the top 16 bits.
+// shifts off the end contributes back, in the top 16 bits. The table is
+// linear over GF(2) -- each bit of n adds 0x1c2 shifted to its place --
+// so it is computed, without a branch or a load whose address depends on
+// n: a switch on a secret nibble was 15 compares, mispredicted, and its
+// timing told which nibble it was.
 func reduction(_ n: uint64) -> uint64 {
-    switch n {
-    case 0: return 0x0000
-    case 1: return 0x1c20
-    case 2: return 0x3840
-    case 3: return 0x2460
-    case 4: return 0x7080
-    case 5: return 0x6ca0
-    case 6: return 0x48c0
-    case 7: return 0x54e0
-    case 8: return 0xe100
-    case 9: return 0xfd20
-    case 10: return 0xd940
-    case 11: return 0xc560
-    case 12: return 0x9180
-    case 13: return 0x8da0
-    case 14: return 0xa9c0
-    default: return 0xb5e0
-    }
+    return ((0 &- (n & 1)) & 0x1c20)
+        ^ ((0 &- ((n >> 1) & 1)) & 0x3840)
+        ^ ((0 &- ((n >> 2) & 1)) & 0x7080)
+        ^ ((0 &- ((n >> 3) & 1)) & 0xe100)
 }
 
 func reverseNibble(_ i: int) -> int {

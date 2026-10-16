@@ -21,6 +21,14 @@ func qround(_ x: inout [uint32], _ a: int, _ b: int, _ c: int, _ d: int) {
     x[c] &+= x[d]; x[b] ^= x[c]; x[b] = rol(x[b], 7)
 }
 
+// xorLe writes to dst the four bytes at src xored with k, little-endian.
+func xorLe(_ dst: UnsafeMutablePointer<uint8>, _ src: UnsafePointer<uint8>, _ k: uint32) {
+    dst.pointee = src.pointee ^ uint8(truncatingIfNeeded: k)
+    (dst + 1).pointee = (src + 1).pointee ^ uint8(truncatingIfNeeded: k >> 8)
+    (dst + 2).pointee = (src + 2).pointee ^ uint8(truncatingIfNeeded: k >> 16)
+    (dst + 3).pointee = (src + 3).pointee ^ uint8(truncatingIfNeeded: k >> 24)
+}
+
 /// Cipher is a stateful ChaCha20 stream cipher instance (RFC 8439).
 public struct Cipher {
     var key: [uint32] = [uint32](repeating: 0, count: 8)
@@ -130,36 +138,24 @@ public struct Cipher {
                     ctr &+= 1
 
                     let chunkLen = total - offset < 64 ? total - offset : 64
-                    var j = 0
-                    while j < chunkLen {
-                        var word: uint32 = 0
-                        switch j >> 2 {
-                        case 0: word = x0
-                        case 1: word = x1
-                        case 2: word = x2
-                        case 3: word = x3
-                        case 4: word = x4
-                        case 5: word = x5
-                        case 6: word = x6
-                        case 7: word = x7
-                        case 8: word = x8
-                        case 9: word = x9
-                        case 10: word = x10
-                        case 11: word = x11
-                        case 12: word = x12
-                        case 13: word = x13
-                        case 14: word = x14
-                        default: word = x15
-                        }
-                        // Four bytes of the word at a time where they fit.
-                        if j + 4 <= chunkLen {
-                            out[offset + j] = inp[offset + j] ^ uint8(truncatingIfNeeded: word)
-                            out[offset + j + 1] = inp[offset + j + 1] ^ uint8(truncatingIfNeeded: word >> 8)
-                            out[offset + j + 2] = inp[offset + j + 2] ^ uint8(truncatingIfNeeded: word >> 16)
-                            out[offset + j + 3] = inp[offset + j + 3] ^ uint8(truncatingIfNeeded: word >> 24)
-                            j += 4
-                        } else {
-                            out[offset + j] = inp[offset + j] ^ uint8(truncatingIfNeeded: word >> uint32((j & 3) * 8))
+                    if chunkLen == 64 {
+                        // A whole block: each word to its four bytes.
+                        let o = out.baseAddress! + offset
+                        let i = inp.baseAddress! + offset
+                        xorLe(o, i, x0); xorLe(o + 4, i + 4, x1)
+                        xorLe(o + 8, i + 8, x2); xorLe(o + 12, i + 12, x3)
+                        xorLe(o + 16, i + 16, x4); xorLe(o + 20, i + 20, x5)
+                        xorLe(o + 24, i + 24, x6); xorLe(o + 28, i + 28, x7)
+                        xorLe(o + 32, i + 32, x8); xorLe(o + 36, i + 36, x9)
+                        xorLe(o + 40, i + 40, x10); xorLe(o + 44, i + 44, x11)
+                        xorLe(o + 48, i + 48, x12); xorLe(o + 52, i + 52, x13)
+                        xorLe(o + 56, i + 56, x14); xorLe(o + 60, i + 60, x15)
+                    } else {
+                        // The last, short block, a byte at a time.
+                        let ks = [x0, x1, x2, x3, x4, x5, x6, x7, x8, x9, x10, x11, x12, x13, x14, x15]
+                        var j = 0
+                        while j < chunkLen {
+                            out[offset + j] = inp[offset + j] ^ uint8(truncatingIfNeeded: ks[j >> 2] >> uint32((j & 3) * 8))
                             j += 1
                         }
                     }

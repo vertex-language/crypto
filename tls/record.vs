@@ -87,12 +87,7 @@ public struct RecordCipher {
     /// Encrypt wraps plaintext into a TLS 1.3 protected record.
     public mutating func Encrypt(contentType: uint8, plaintext: [uint8]) throws -> [uint8] {
         // Construct inner plaintext: plaintext || contentType
-        var inner: [uint8] = []
-        var p = 0
-        while p < plaintext.count {
-            inner.append(plaintext[p])
-            p += 1
-        }
+        var inner = plaintext
         inner.append(contentType)
 
         let tagSize = 16
@@ -114,17 +109,8 @@ public struct RecordCipher {
 
         self.SequenceNumber &+= 1
 
-        var record: [uint8] = []
-        var h = 0
-        while h < header.count {
-            record.append(header[h])
-            h += 1
-        }
-        var c = 0
-        while c < ciphertext.count {
-            record.append(ciphertext[c])
-            c += 1
-        }
+        var record = header
+        record.append(contentsOf: ciphertext)
         return record
     }
 

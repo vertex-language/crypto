@@ -16,38 +16,35 @@ public enum AeadError: Error {
     case authenticationFailed
 }
 
-func pad16(_ b: inout [uint8]) {
-    let remainder = b.count % 16
-    if remainder != 0 {
-        var p = 0
-        let count = 16 - remainder
-        while p < count {
-            b.append(0)
-            p += 1
-        }
-    }
-}
-
-func appendU64Le(_ b: inout [uint8], _ v: uint64) {
-    var shift: uint64 = 0
+// tag is the Poly1305 tag RFC 8439 puts on a record: of aad, padded to
+// 16 bytes, ciphertext, padded, and the two lengths, little-endian. The
+// pieces are written to the MAC as they are, not gathered into one input.
+func tag(_ polyKey: [uint8], _ aad: [uint8], _ ciphertext: [uint8]) -> [uint8] {
+    var mac = poly1305.MAC(key: polyKey)
+    mac.Write(aad)
+    mac.Write(padding(aad.count))
+    mac.Write(ciphertext)
+    mac.Write(padding(ciphertext.count))
+    var lengths = [uint8](repeating: 0, count: 16)
     var i = 0
     while i < 8 {
-        b.append(uint8(truncatingIfNeeded: v >> shift))
-        shift &+= 8
+        lengths[i] = uint8(truncatingIfNeeded: uint64(aad.count) >> uint64(i * 8))
+        lengths[8 + i] = uint8(truncatingIfNeeded: uint64(ciphertext.count) >> uint64(i * 8))
         i += 1
     }
+    mac.Write(lengths)
+    return mac.Sum()
+}
+
+// padding is the zeros that bring n bytes to a multiple of 16.
+func padding(_ n: int) -> [uint8] {
+    return [uint8](repeating: 0, count: (16 - n % 16) % 16)
 }
 
 func generatePolyKey(key: [uint8], nonce: [uint8]) throws -> [uint8] {
     let zeroBlock = [uint8](repeating: 0, count: 64)
     let ks = try chacha20.Encrypt(key: key, nonce: nonce, plaintext: zeroBlock, counter: 0)
-    var polyKey = [uint8](repeating: 0, count: 32)
-    var i = 0
-    while i < 32 {
-        polyKey[i] = ks[i]
-        i += 1
-    }
-    return polyKey
+    return Array(ks[0..<32])
 }
 
 /// AEAD represents a ChaCha20-Poly1305 Authenticated Encryption with Associated Data instance (RFC 8439).
@@ -77,35 +74,9 @@ public struct AEAD {
         // 2. Encrypt plaintext with ChaCha20 starting at counter 1
         let ciphertext = try chacha20.Encrypt(key: self.key, nonce: nonce, plaintext: plaintext, counter: 1)
 
-        // 3. Construct Poly1305 input: AAD || pad16 || Ciphertext || pad16 || len(AAD) || len(CT)
-        var polyIn: [uint8] = []
-        var a = 0
-        while a < additionalData.count {
-            polyIn.append(additionalData[a])
-            a += 1
-        }
-        pad16(&polyIn)
-
-        var c = 0
-        while c < ciphertext.count {
-            polyIn.append(ciphertext[c])
-            c += 1
-        }
-        pad16(&polyIn)
-
-        appendU64Le(&polyIn, uint64(additionalData.count))
-        appendU64Le(&polyIn, uint64(ciphertext.count))
-
-        // 4. Compute Poly1305 tag
-        let tag = poly1305.Sum(polyIn, key: polyKey)
-
-        // 5. Append tag to ciphertext
+        // 3. Tag AAD || pad16 || Ciphertext || pad16 || len(AAD) || len(CT)
         var result = ciphertext
-        var t = 0
-        while t < tag.count {
-            result.append(tag[t])
-            t += 1
-        }
+        result.append(contentsOf: tag(polyKey, additionalData, ciphertext))
         return result
     }
 
@@ -119,48 +90,18 @@ public struct AEAD {
         }
 
         let ctLen = ciphertextAndTag.count - TagSize
-        var ciphertext = [uint8](repeating: 0, count: ctLen)
-        var tag = [uint8](repeating: 0, count: TagSize)
-
-        var i = 0
-        while i < ctLen {
-            ciphertext[i] = ciphertextAndTag[i]
-            i += 1
-        }
-        i = 0
-        while i < TagSize {
-            tag[i] = ciphertextAndTag[ctLen + i]
-            i += 1
-        }
+        let ciphertext = Array(ciphertextAndTag[0..<ctLen])
+        let mac = Array(ciphertextAndTag[ctLen..<ciphertextAndTag.count])
 
         // 1. Generate one-time Poly1305 key
         let polyKey = try generatePolyKey(key: self.key, nonce: nonce)
 
-        // 2. Construct Poly1305 input
-        var polyIn: [uint8] = []
-        var a = 0
-        while a < additionalData.count {
-            polyIn.append(additionalData[a])
-            a += 1
-        }
-        pad16(&polyIn)
-
-        var c = 0
-        while c < ciphertext.count {
-            polyIn.append(ciphertext[c])
-            c += 1
-        }
-        pad16(&polyIn)
-
-        appendU64Le(&polyIn, uint64(additionalData.count))
-        appendU64Le(&polyIn, uint64(ciphertext.count))
-
-        // 3. Verify tag in constant time
-        if !poly1305.Verify(mac: tag, msg: polyIn, key: polyKey) {
+        // 2. Verify tag in constant time
+        if subtle.ConstantTimeCompare(mac, tag(polyKey, additionalData, ciphertext)) != 1 {
             throw AeadError.authenticationFailed
         }
 
-        // 4. Decrypt ciphertext
+        // 3. Decrypt ciphertext
         return try chacha20.Decrypt(key: self.key, nonce: nonce, ciphertext: ciphertext, counter: 1)
     }
 }

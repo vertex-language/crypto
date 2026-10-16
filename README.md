@@ -50,6 +50,9 @@ vsc run test-rand
 vsc run test-ecdsa         # the curves' constants and malformed signatures
 vsc run test-cert          # offline: signatures and broken chains
 vsc run test-cert-live     # real servers, verified
+
+# Throughput of what a TLS download runs: sha256, and both record ciphers
+vsc run bench
 ```
 
 ### SHA-256 Digest
